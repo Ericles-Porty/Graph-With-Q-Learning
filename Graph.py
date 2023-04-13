@@ -46,8 +46,6 @@ class Vertex:
         for edge in self.edges:
             if edge.q > bigger_q:
                 bigger_q = edge.q
-        if bigger_q != DEFAULT_Q:
-            print(f'Maior Q de {self.name} = {bigger_q}')
         return bigger_q
 
     def get_best_edge_end_index(self):
@@ -105,8 +103,7 @@ class Graph:
         for vertex in self.vertex:
             if vertex.name == name:
                 return vertex
-        # raise Exception(f'Vertex with name {name} not found')
-        return Vertex(0, '0', 0.0)
+        raise Exception(f'Vertex with name {name} not found')
 
     def set_goal(self, goal: str) -> None:
         self.goal = self.get_vertex_by_name(goal)
@@ -127,15 +124,12 @@ class Graph:
 class Agent:
 
     def update_q(self) -> None:
-        print('Atualizando Q')
         if len(self.path) > 1:
             last_vertex = self.graph.get_vertex_by_name(self.path[-2].name)
             for edge in last_vertex.edges:
                 if edge.end == self.path[-1]:
                     edge.q = calc_q(FACTOR, self.path[-1].r,
                                     self.path[-1].get_bigger_q_action())
-                    print(
-                        f'Q de {edge.start.name}->{edge.end.name} = {edge.q}')
 
         # for i in range(len(self.path) - 1):
         #     for edge in self.path[i].edges:
@@ -163,12 +157,7 @@ class Agent:
             action_generated = int(random.random() * len(self.current.edges))
         else:
             action_generated = self.current.get_best_edge_end_index()
-            print(f'Action generated: {action_generated}')
 
-        print(f'Action generated: {action_generated}')
-        print(f'Current: {self.current}')
-        for e in self.current.edges:
-            print(f'Edge: {e.start.name} -> {e.end.name} | Q: {e.q}')
         self.path.append(self.current.edges[action_generated].end)
         self.current = self.path[-1]
         self.update_q()
@@ -217,8 +206,10 @@ def main():
     _file = open('arestas.csv', 'r', encoding='utf-8-sig')
     for line in _file:
         line = line.split(',')
-        g.add_edge(str(int(line[0])+1), str(int(line[1])+1), int(line[2]))
+        g.add_edge(str(line[0]), str(line[1]), int(line[2]))
 
+    # for edge in g.get_all_edges():
+    # print(edge)
     _file.close()
 
     g.set_start('1')
@@ -227,24 +218,32 @@ def main():
     print_graph(g)
     g.define_reward(10.0, g.goal)
     a = Agent(g)
+    print(g.start)
 
-    # v = g.get_all_vertex()
-    # times = 5
-    # for i in range(times):
+    times = 10000
 
-    #     a.graph.set_start(random.random() * len(g.vertex))
-    #     print('-=' * 15 + f'Iteração {i + 1}' + '-=' * 15)
-    #     print('Current: ' + a.current.name)
-    #     while a.current != g.goal:
-    #         a.move()
+    for i in range(times):
+        print('-=' * 15 + f'Iteração {i + 1}' + '-=' * 15)
+        a.graph.set_start(str(int(random.random() * len(g.vertex))))
+        print('Started in : ', g.start.name)
+        while a.current != g.goal:
+            a.move()
 
-    #     a.current = g.start
-    #     a.path = []
-    #     a.path.append(a.current)
+        a.current = g.start
+        a.path = []
+        a.path.append(a.current)
 
-    # # # debug(a, g, v)
-    # print_graph(g)
+    print_graph(g)
 
 
 if __name__ == "__main__":
     main()
+
+# -*- coding: utf-8 -*-
+"""
+TODO: VERIFICAR CONVERGÊNCIA, 
+TODO: SALVAR TABELA Q
+TODO: APLICAR ATRIBUTOS DE DISTANCIA
+TODO: TESTAR COM OUTROS PESOS
+TODO: TESTAR COM OUTROS FATOR DE DESCONTO
+"""
