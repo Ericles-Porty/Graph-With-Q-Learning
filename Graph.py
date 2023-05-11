@@ -1,13 +1,15 @@
 import time
 import random
 
-FACTOR = 0.8
+ALPHA = 0.4  # Taxa de aprendizado
+GAMMA = 0.8  # Fator de desconto
+EPSILON = 0.8  # Taxa de exploração
+
 DEFAULT_Q = 0.0
-RANDOM_FACTOR = 0.8
 
 
-def calc_q(factor: float, reward: float, max_q: float) -> float:
-    return reward + factor * max_q
+def calc_q(actual_q: float, reward: float, max_q: float) -> float:
+    return actual_q + ALPHA * (reward + GAMMA * max_q - actual_q)
 
 
 class Edge:
@@ -64,7 +66,7 @@ class Vertex:
         return edge_destiny.end
 
     def __str__(self) -> str:
-        return f"{self.name} - (R={self.r})"
+        return f"Vertex: {self.name} | R={self.r}"
 
 
 class Graph:
@@ -160,11 +162,18 @@ class Graph:
 
 class Agent:
 
-    def __init__(self, graph: Graph) -> None:
+    def __init__(self,
+                 graph: Graph,
+                 contador_a=0,
+                 contador_b=0,
+                 delta_q_total=0.0) -> None:
         self.graph = graph
         self.current = graph.start
         self.path = []
         self.path.append(self.current)
+        self.contador_b = contador_b
+        self.contador_a = contador_a
+        self.delta_q_total = delta_q_total
 
     def __str__(self) -> str:
         return f"Current: {self.current.name}"
@@ -173,29 +182,32 @@ class Agent:
         if len(self.path) > 1:
             last_vertex = self.graph.get_vertex_by_name(self.path[-2].name)
             for edge in last_vertex.edges:
-                if edge.end == self.path[-1]:
-                    edge.q = calc_q(FACTOR, self.path[-1].r,
-                                    self.path[-1].get_bigger_q_action())
+                if edge.end == self.current:
+                    edge.q = calc_q(edge.q, self.current.r,
+                                    self.current.get_bigger_q_action())
+                    # edge.q = edge.q + delta_q
+                    # print(f"Delta Q: {delta_q}")
+                    # edge.q = delta_q
+                    self.delta_q_total += edge.q
 
     def move(self) -> None:
         random_value = random.random()
-        # Tem uma chance de RANDOM_FACTOR de ir para melhor ação
-        if random_value > RANDOM_FACTOR:
+        # Tem uma chance de EPSILON de ir para melhor ação
+        if random_value < EPSILON:
             bigger_q = self.current.get_bigger_q_action()
             if bigger_q != DEFAULT_Q:
                 action_generated = self.current.get_best_edge_end_index()
             else:
                 action_generated = int(random.random() *
                                        len(self.current.edges))
+            # self.contador_a = self.contador_a + 1
         else:
             action_generated = int(random.random() * len(self.current.edges))
+            # self.contador_b = self.contador_b + 1
 
-        self.path.append(self.current.edges[action_generated].end)
-        self.current = self.path[-1]
+        self.path.append(self.current.edges[action_generated].end) # Adiciona o vértice escolhido no caminho
+        self.current = self.path[-1] # O vértice atual é o último vértice escolhido do caminho
         self.update_q()
-
-        if self.current == self.graph.goal:
-            self.update_q()
 
     def train(self, debug=False) -> None:
         times = 10000
@@ -219,6 +231,9 @@ class Agent:
                     str(int(random.random() * len(self.graph.vertex))))
                 self.path = []
                 self.path.append(self.current)
+                # print(f"Delta Q: {self.delta_q_total}")
+
+        print(f"Contador Delta Q: {self.delta_q_total}")
 
     def test(self, start_name) -> list:
         path = []
@@ -281,23 +296,28 @@ def main():
     # define the start and goal
     g.set_start("1")
     g.set_goal("21")
-    g.define_reward(10.0, g.goal)
+    g.define_reward(1.0, g.goal)
 
-    g.read_table_q()
+    # Read table q
+    # g.read_table_q()
 
     a = Agent(g)
 
     a.train()
+
     save_table_q(g)
 
-    print_graph(g)
+    # print_graph(g)
 
     # Test path
-    path = a.test(start_name="40")
+    # path = a.test(start_name="40")
 
-    print("Path:")
-    for node in path:
-        print(node.name + " -> ", end="")
+    # print("Path:")
+    # for node in path:
+    #     print(node.name + " -> ", end="")
+
+    print()
+    print("Contador total delta q: " + str(a.delta_q_total))
 
 
 if __name__ == "__main__":
@@ -305,8 +325,6 @@ if __name__ == "__main__":
 
 # -*- coding: utf-8 -*-
 """
-TODO: VERIFICAR CONVERGÊNCIA, 
+TODO: VERIFICAR CONVERGÊNCIA
 TODO: APLICAR ATRIBUTOS DE DISTANCIA
-TODO: TESTAR COM OUTROS PESOS
-TODO: TESTAR COM OUTROS FATOR DE DESCONTO
 """
