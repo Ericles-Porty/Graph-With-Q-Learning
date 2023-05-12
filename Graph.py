@@ -1,15 +1,43 @@
 import time
 import random
+import matplotlib.pyplot as plt
 
-ALPHA = 0.4  # Taxa de aprendizado
+ALPHA = 0.3  # Taxa de aprendizado
 GAMMA = 0.8  # Fator de desconto
-EPSILON = 0.8  # Taxa de exploração
+EPSILON = 0.9  # Taxa de exploração
+
+DECIMAL_PRECISION = 5
 
 DEFAULT_Q = 0.0
 
 
+def generate_plot(dq: list) -> None:
+    plt.plot(dq)
+    plt.title("Gráfico de convergência do aprendizado")
+    plt.ylabel("Delta Q Total")
+    plt.xlabel("Episódios X 500")
+    plt.show()
+
+
+def get_delta_q(actual_q: float, reward: float, max_q: float) -> float:
+    return ALPHA * (reward + GAMMA * max_q - actual_q)
+
+
 def calc_q(actual_q: float, reward: float, max_q: float) -> float:
-    return actual_q + ALPHA * (reward + GAMMA * max_q - actual_q)
+    return actual_q + get_delta_q(actual_q, reward, max_q)
+
+
+def is_converged(dq: list) -> bool:
+    # Verifica se os últimos 4 valores de delta q são iguais
+    if len(dq) > 4:
+        return (dq[-1] == dq[-2] and dq[-1] == dq[-3])
+
+
+def save_delta_q_list(dq: list) -> None:
+    _file = open("delta_q.csv", "w", encoding="utf-8")
+    for i in dq:
+        _file.write(f"{i}\n")
+    _file.close()
 
 
 class Edge:
@@ -170,25 +198,44 @@ class Agent:
         self.graph = graph
         self.current = graph.start
         self.path = []
+        self.epoch = 0
         self.path.append(self.current)
         self.contador_b = contador_b
         self.contador_a = contador_a
         self.delta_q_total = delta_q_total
+        self.list_delta_q = [0]
+        self.converged = False
 
     def __str__(self) -> str:
         return f"Current: {self.current.name}"
+
+    def reset_agent(self) -> None:
+        self.current = self.graph.get_vertex_by_name(
+            str(int(random.random() * len(self.graph.vertex))))
+        self.path = []
+        self.path.append(self.current)
 
     def update_q(self) -> None:
         if len(self.path) > 1:
             last_vertex = self.graph.get_vertex_by_name(self.path[-2].name)
             for edge in last_vertex.edges:
                 if edge.end == self.current:
-                    edge.q = calc_q(edge.q, self.current.r,
-                                    self.current.get_bigger_q_action())
-                    # edge.q = edge.q + delta_q
-                    # print(f"Delta Q: {delta_q}")
-                    # edge.q = delta_q
-                    self.delta_q_total += edge.q
+                    delta_q = get_delta_q(edge.q, self.current.r,
+                                          self.current.get_bigger_q_action())
+                    self.delta_q_total += delta_q
+                    edge.q = edge.q + delta_q
+
+            self.epoch += 1
+
+            if self.epoch % 500 == 0:
+                delta_q_total_formatted = float("{:.6f}".format(self.delta_q_total))
+                self.list_delta_q.append(delta_q_total_formatted)
+                # self.list_delta_q.append(self.delta_q_total)
+
+                if is_converged(self.list_delta_q):
+                    self.converged = True
+                    save_delta_q_list(self.list_delta_q)
+                    generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         random_value = random.random()
@@ -200,40 +247,24 @@ class Agent:
             else:
                 action_generated = int(random.random() *
                                        len(self.current.edges))
-            # self.contador_a = self.contador_a + 1
         else:
             action_generated = int(random.random() * len(self.current.edges))
-            # self.contador_b = self.contador_b + 1
 
-        self.path.append(self.current.edges[action_generated].end) # Adiciona o vértice escolhido no caminho
-        self.current = self.path[-1] # O vértice atual é o último vértice escolhido do caminho
+        # Adiciona o vértice escolhido no caminho
+        self.path.append(self.current.edges[action_generated].end)
+        # O vértice atual é o último vértice escolhido do caminho
+        self.current = self.path[-1]
         self.update_q()
 
-    def train(self, debug=False) -> None:
-        times = 10000
-        if debug:
-            for i in range(times):
-                print("-=" * 5 + f"Iteração {i + 1}" + "-=" * 5)
+    def train(self) -> None:
+        while not self.converged:
+            while self.current != self.graph.goal:
+                self.move()
 
-                while self.current != self.graph.goal:
-                    self.move()
+            # Limpa o caminho do agente e o coloca em um vértice aleatório
+            self.reset_agent()
 
-                self.current = self.graph.get_vertex_by_name(
-                    str(int(random.random() * len(self.graph.vertex))))
-                self.path = []
-                self.path.append(self.current)
-        else:
-            for i in range(times):
-                while self.current != self.graph.goal:
-                    self.move()
-
-                self.current = self.graph.get_vertex_by_name(
-                    str(int(random.random() * len(self.graph.vertex))))
-                self.path = []
-                self.path.append(self.current)
-                # print(f"Delta Q: {self.delta_q_total}")
-
-        print(f"Contador Delta Q: {self.delta_q_total}")
+        print(self.list_delta_q)
 
     def test(self, start_name) -> list:
         path = []
