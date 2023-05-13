@@ -3,10 +3,8 @@ import random
 import matplotlib.pyplot as plt
 
 ALPHA = 0.3  # Taxa de aprendizado
-GAMMA = 0.8  # Fator de desconto
+GAMMA = 0.7  # Fator de desconto
 EPSILON = 0.9  # Taxa de exploração
-
-DECIMAL_PRECISION = 5
 
 DEFAULT_Q = 0.0
 
@@ -15,7 +13,7 @@ def generate_plot(dq: list) -> None:
     plt.plot(dq)
     plt.title("Gráfico de convergência do aprendizado")
     plt.ylabel("Delta Q Total")
-    plt.xlabel("Episódios X 500")
+    plt.xlabel("Episódios")
     plt.show()
 
 
@@ -23,14 +21,10 @@ def get_delta_q(actual_q: float, reward: float, max_q: float) -> float:
     return ALPHA * (reward + GAMMA * max_q - actual_q)
 
 
-def calc_q(actual_q: float, reward: float, max_q: float) -> float:
-    return actual_q + get_delta_q(actual_q, reward, max_q)
-
-
 def is_converged(dq: list) -> bool:
     # Verifica se os últimos 4 valores de delta q são iguais
     if len(dq) > 4:
-        return (dq[-1] == dq[-2] and dq[-1] == dq[-3])
+        return (dq[-1] == dq[-2] and dq[-1] == dq[-3] and dq[-1] == dq[-4])
 
 
 def save_delta_q_list(dq: list) -> None:
@@ -190,18 +184,12 @@ class Graph:
 
 class Agent:
 
-    def __init__(self,
-                 graph: Graph,
-                 contador_a=0,
-                 contador_b=0,
-                 delta_q_total=0.0) -> None:
+    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
         self.graph = graph
         self.current = graph.start
         self.path = []
         self.epoch = 0
         self.path.append(self.current)
-        self.contador_b = contador_b
-        self.contador_a = contador_a
         self.delta_q_total = delta_q_total
         self.list_delta_q = [0]
         self.converged = False
@@ -216,6 +204,7 @@ class Agent:
         self.path.append(self.current)
 
     def update_q(self) -> None:
+        has_change = False
         if len(self.path) > 1:
             last_vertex = self.graph.get_vertex_by_name(self.path[-2].name)
             for edge in last_vertex.edges:
@@ -224,18 +213,22 @@ class Agent:
                                           self.current.get_bigger_q_action())
                     self.delta_q_total += delta_q
                     edge.q = edge.q + delta_q
+                    if delta_q != 0:
+                        has_change = True
 
             self.epoch += 1
 
-            if self.epoch % 500 == 0:
-                delta_q_total_formatted = float("{:.6f}".format(self.delta_q_total))
-                self.list_delta_q.append(delta_q_total_formatted)
-                # self.list_delta_q.append(self.delta_q_total)
+            # if self.epoch % 500 == 0:
+            if has_change:
+                # delta_q_total_formatted = float("{:.6f}".format(
+                #     self.delta_q_total))
+                # self.list_delta_q.append(delta_q_total_formatted)
+                self.list_delta_q.append(self.delta_q_total)
 
-                if is_converged(self.list_delta_q):
-                    self.converged = True
-                    save_delta_q_list(self.list_delta_q)
-                    generate_plot(self.list_delta_q)
+            if is_converged(self.list_delta_q):
+                self.converged = True
+                save_delta_q_list(self.list_delta_q)
+                generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         random_value = random.random()
