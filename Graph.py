@@ -228,11 +228,7 @@ class Agent:
 
             self.epoch += 1
 
-            # if self.epoch % 500 == 0:
             if has_change:
-                # delta_q_total_formatted = float("{:.6f}".format(
-                #     self.delta_q_total))
-                # self.list_delta_q.append(delta_q_total_formatted)
                 self.list_delta_q.append(self.delta_q_total)
 
             if self.epoch % 5000 == 0:
@@ -302,52 +298,41 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 
 
 def main():
-    # g = Graph()
+    full_run = False
+    is_reading_table_q = False
 
-    # extract the data of vertices.csv and arestas.csv
-    # g.read_csv()
-
-    # define the start and goal
-    # g.set_start("1")
-    # g.set_goal("21")
-    # g.define_reward(1.0, g.goal)
-
-    # Read table q
-    # g.read_table_q()
-
-    # a = Agent(g)
-
-    # a.train()
-
-    # save_table_q(g)
-
-    # print_graph(g)
-
-    # Test path
-    # path = a.test(start_name="40")
-
-    # save_path([vertex.name for vertex in path])
-
-    # print("Path:")
-    # for node in path:
-    #     print(node.name + " -> ", end="")
-
-    # print()
-    # print("Contador total delta q: " + str(a.delta_q_total))
-
-    # create table_q.csv for every vertex
-    g = Graph()
-    g.read_csv()
-    all_vertex = g.get_all_vertex()
-    for vertex in all_vertex:
+    if full_run:
+        # create table q for every vertex
+        g = Graph()
+        g.read_csv()
+        all_vertex = g.get_all_vertex()
+        for vertex in all_vertex:
+            g = Graph()
+            g.read_csv()
+            g.set_start("1")
+            g.set_goal(vertex.name)
+            g.define_reward(10.0, g.goal)
+            a = Agent(g)
+            a.train()
+            save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
+    
+    else:
+        # create table_q.csv for only one vertex
         g = Graph()
         g.read_csv()
         g.set_start("1")
-        g.set_goal(vertex.name)
-        g.define_reward(1.0, g.goal)
+        g.set_goal("21")
+        g.define_reward(10.0, g.goal)
+        # g.define_reward(4.0, g.get_vertex_by_name("42"))
+
+        if is_reading_table_q:
+            g.read_table_q()
+
         a = Agent(g)
         a.train()
-        save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
+        save_table_q(g)
+        path = a.test(start_name="10")
+        save_path([vertex.name for vertex in path])
 
 
 if __name__ == "__main__":
@@ -356,5 +341,6 @@ if __name__ == "__main__":
 # -*- coding: utf-8 -*-
 """
 TODO: VERIFICAR CONVERGÊNCIA
+TODO: APLICAR VIES
 TODO: APLICAR ATRIBUTOS DE DISTANCIA
 """
