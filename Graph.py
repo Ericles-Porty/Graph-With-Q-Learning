@@ -22,16 +22,13 @@ def get_delta_q(actual_q: float, reward: float, max_q: float) -> float:
     return ALPHA * (reward + GAMMA * max_q - actual_q)
 
 
-def is_converged(dq: list) -> bool:
-    if len(dq) > 5:
-        for i in range(1, 5):
-            print(i)
-            if dq[-1] != dq[-i]:
+def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
+    # verify if the last 5 values of delta q are equal
+    if len(delta_q_list) > match_numbers:
+        for i in range(1, match_numbers):
+            if delta_q_list[-1] != delta_q_list[-i]:
                 return False
         return True
-
-    # if len(dq) > 4:
-    # return (dq[-1] == dq[-2] and dq[-1] == dq[-3] and dq[-1] == dq[-4])
 
 
 def save_delta_q_list(dq: list) -> None:
@@ -174,9 +171,9 @@ class Graph:
     def define_reward(self, reward: float, vertex: Vertex) -> None:
         vertex.r = reward
 
-    def read_table_q(self) -> None:
+    def read_table_q(self, table_name: str = "table_q.csv") -> None:
         try:
-            _file = open("table_q.csv", "r", encoding="utf-8-sig")
+            _file = open(table_name, "r", encoding="utf-8-sig")
             for line in _file:
                 line = line.split(",")
                 q = float(line[2])
@@ -208,13 +205,12 @@ class Agent:
         self.list_delta_q = [0]
         self.converged = False
 
-    def __str__(self) -> str:
-        return f"Current: {self.current.name}"
-
     def reset_agent(self) -> None:
-        self.current = self.graph.get_vertex_by_name(
+        random_vertex = self.graph.get_vertex_by_name(
             str(int(random.random() * len(self.graph.vertex))))
-        self.path = []
+        
+        self.current = random_vertex
+        self.path.clear()
         self.path.append(self.current)
 
     def update_q(self) -> None:
@@ -227,7 +223,6 @@ class Agent:
                                           self.current.get_bigger_q_action())
                     self.delta_q_total += delta_q
                     edge.q = edge.q + delta_q
-                    # TODO Verificar convergencia
                     if delta_q != 0:
                         has_change = True
 
@@ -244,12 +239,12 @@ class Agent:
                 if is_converged(self.list_delta_q):
                     self.converged = True
                     save_delta_q_list(self.list_delta_q)
-                    # generate_plot(self.list_delta_q)
+                    generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         random_value = random.random()
-        # Tem uma chance EPSILON de ir para melhor ação
-        if random_value < EPSILON:
+        # Has a chance EPSILON to go directly to the best action
+        if random_value > EPSILON:
             bigger_q = self.current.get_bigger_q_action()
             if bigger_q != DEFAULT_Q:
                 action_generated = self.current.get_best_edge_end_index()
@@ -259,10 +254,9 @@ class Agent:
         else:
             action_generated = int(random.random() * len(self.current.edges))
 
-        # Adiciona o vértice escolhido no caminho
-        self.path.append(self.current.edges[action_generated].end)
-        # O vértice atual é o último vértice escolhido do caminho
-        self.current = self.path[-1]
+        chosen_vertex = self.current.edges[action_generated].end
+        self.current = chosen_vertex
+        self.path.append(self.current)
         self.update_q()
 
     def train(self) -> None:
@@ -270,10 +264,7 @@ class Agent:
             while self.current != self.graph.goal:
                 self.move()
 
-            # Limpa o caminho do agente e o coloca em um vértice aleatório
             self.reset_agent()
-
-        print(self.list_delta_q)
 
     def test(self, start_name) -> list:
         path = []
@@ -302,32 +293,12 @@ def print_graph(g: Graph) -> None:
 
 
 def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
-    # create a folder to save the table_q.csv
     if not os.path.exists("table_q"):
         os.mkdir("table_q")
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
     for edge in g.get_all_edges():
         _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
     _file.close()
-
-
-def debug(a: Agent, g: Graph, v: list):
-    print("Start: " + a.path[0].name)
-    print("Goal: " + a.path[-1].name)
-
-    print("Vertex:")
-    for vertex in v:
-        print(vertex)
-
-    print("Path:")
-    for vertex in a.path:
-        print(vertex.name + " -> ", end="")
-
-    print()
-
-    print("Edges:")
-    for edge in g.get_all_edges():
-        print(edge)
 
 
 def main():
