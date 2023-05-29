@@ -1,3 +1,4 @@
+import os
 import time
 import random
 import matplotlib.pyplot as plt
@@ -22,15 +23,28 @@ def get_delta_q(actual_q: float, reward: float, max_q: float) -> float:
 
 
 def is_converged(dq: list) -> bool:
-    # Verifica se os últimos 4 valores de delta q são iguais
-    if len(dq) > 4:
-        return (dq[-1] == dq[-2] and dq[-1] == dq[-3] and dq[-1] == dq[-4])
+    if len(dq) > 5:
+        for i in range(1, 5):
+            print(i)
+            if dq[-1] != dq[-i]:
+                return False
+        return True
+
+    # if len(dq) > 4:
+    # return (dq[-1] == dq[-2] and dq[-1] == dq[-3] and dq[-1] == dq[-4])
 
 
 def save_delta_q_list(dq: list) -> None:
     _file = open("delta_q.csv", "w", encoding="utf-8")
     for i in dq:
         _file.write(f"{i}\n")
+    _file.close()
+
+
+def save_path(path: list) -> None:
+    _file = open("path.csv", "w", encoding="utf-8")
+    p = [str(i) for i in path]
+    _file.write(",".join(p))
     _file.close()
 
 
@@ -213,6 +227,7 @@ class Agent:
                                           self.current.get_bigger_q_action())
                     self.delta_q_total += delta_q
                     edge.q = edge.q + delta_q
+                    # TODO Verificar convergencia
                     if delta_q != 0:
                         has_change = True
 
@@ -225,14 +240,15 @@ class Agent:
                 # self.list_delta_q.append(delta_q_total_formatted)
                 self.list_delta_q.append(self.delta_q_total)
 
-            if is_converged(self.list_delta_q):
-                self.converged = True
-                save_delta_q_list(self.list_delta_q)
-                generate_plot(self.list_delta_q)
+            if self.epoch % 5000 == 0:
+                if is_converged(self.list_delta_q):
+                    self.converged = True
+                    save_delta_q_list(self.list_delta_q)
+                    # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         random_value = random.random()
-        # Tem uma chance de EPSILON de ir para melhor ação
+        # Tem uma chance EPSILON de ir para melhor ação
         if random_value < EPSILON:
             bigger_q = self.current.get_bigger_q_action()
             if bigger_q != DEFAULT_Q:
@@ -285,8 +301,11 @@ def print_graph(g: Graph) -> None:
         print("")
 
 
-def save_table_q(g: Graph) -> None:
-    _file = open("table_q.csv", "w", encoding="utf-8")
+def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
+    # create a folder to save the table_q.csv
+    if not os.path.exists("table_q"):
+        os.mkdir("table_q")
+    _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
     for edge in g.get_all_edges():
         _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
     _file.close()
@@ -312,36 +331,52 @@ def debug(a: Agent, g: Graph, v: list):
 
 
 def main():
-    g = Graph()
+    # g = Graph()
 
     # extract the data of vertices.csv and arestas.csv
-    g.read_csv()
+    # g.read_csv()
 
     # define the start and goal
-    g.set_start("1")
-    g.set_goal("21")
-    g.define_reward(1.0, g.goal)
+    # g.set_start("1")
+    # g.set_goal("21")
+    # g.define_reward(1.0, g.goal)
 
     # Read table q
     # g.read_table_q()
 
-    a = Agent(g)
+    # a = Agent(g)
 
-    a.train()
+    # a.train()
 
-    save_table_q(g)
+    # save_table_q(g)
 
     # print_graph(g)
 
     # Test path
     # path = a.test(start_name="40")
 
+    # save_path([vertex.name for vertex in path])
+
     # print("Path:")
     # for node in path:
     #     print(node.name + " -> ", end="")
 
-    print()
-    print("Contador total delta q: " + str(a.delta_q_total))
+    # print()
+    # print("Contador total delta q: " + str(a.delta_q_total))
+
+    # create table_q.csv for every vertex
+    g = Graph()
+    g.read_csv()
+    all_vertex = g.get_all_vertex()
+    for vertex in all_vertex:
+        g = Graph()
+        g.read_csv()
+        g.set_start("1")
+        g.set_goal(vertex.name)
+        g.define_reward(1.0, g.goal)
+        a = Agent(g)
+        a.train()
+        save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
 
 
 if __name__ == "__main__":
