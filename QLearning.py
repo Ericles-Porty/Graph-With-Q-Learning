@@ -172,6 +172,7 @@ class Graph:
         vertex.r = reward
 
     def read_table_q(self, table_name: str = "table_q.csv") -> None:
+        table_name = "table_q/" + table_name
         try:
             _file = open(table_name, "r", encoding="utf-8-sig")
             for line in _file:
@@ -208,7 +209,7 @@ class Agent:
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_name(
             str(int(random.random() * len(self.graph.vertex))))
-        
+
         self.current = random_vertex
         self.path.clear()
         self.path.append(self.current)
@@ -235,7 +236,7 @@ class Agent:
                 if is_converged(self.list_delta_q):
                     self.converged = True
                     save_delta_q_list(self.list_delta_q)
-                    generate_plot(self.list_delta_q)
+                    # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         random_value = random.random()
@@ -297,43 +298,47 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
     _file.close()
 
 
-def main():
-    full_run = False
-    is_reading_table_q = False
-
-    if full_run:
-        # create table q for every vertex
-        g = Graph()
-        g.read_csv()
-        all_vertex = g.get_all_vertex()
-        for vertex in all_vertex:
-            g = Graph()
-            g.read_csv()
-            g.set_start("1")
-            g.set_goal(vertex.name)
-            g.define_reward(10.0, g.goal)
-            a = Agent(g)
-            a.train()
-            save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
-    
-    else:
-        # create table_q.csv for only one vertex
+# create table q for every vertex
+def full_run():
+    g = Graph()
+    g.read_csv()
+    all_vertex = g.get_all_vertex()
+    for vertex in all_vertex:
+        print(f"Running for vertex {vertex.name}")
         g = Graph()
         g.read_csv()
         g.set_start("1")
-        g.set_goal("21")
+        g.set_goal(vertex.name)
         g.define_reward(10.0, g.goal)
-        # g.define_reward(4.0, g.get_vertex_by_name("42"))
-
-        if is_reading_table_q:
-            g.read_table_q()
-
         a = Agent(g)
         a.train()
-        save_table_q(g)
-        path = a.test(start_name="10")
-        save_path([vertex.name for vertex in path])
+        save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
 
+
+# create table_q.csv for only one vertex
+def generate_path(start_name, goal_name, is_reading_table_q=False):
+    g = Graph()
+    g.read_csv()
+    g.set_start(start_name)
+    g.set_goal(goal_name)
+    g.define_reward(10.0, g.goal)
+    # g.define_reward(4.0, g.get_vertex_by_name("42"))
+
+    if is_reading_table_q:
+        table_q_name = f"table_q_{goal_name}.csv"
+        g.read_table_q(table_name=table_q_name)
+
+    a = Agent(g)
+    path = a.test(start_name=start_name)
+    save_path([vertex.name for vertex in path])
+
+
+def main():
+#     full_run() # generate table_q for every vertex
+    
+    generate_path(start_name="1", goal_name="17", is_reading_table_q=True)
+    
+    print("Finished!")
 
 if __name__ == "__main__":
     main()
