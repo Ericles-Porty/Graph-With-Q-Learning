@@ -84,7 +84,7 @@ class Vertex:
                 bigger_q = edge.q
         return bigger_q
 
-    def get_best_edge_end_index(self):
+    def get_best_action_index(self) -> int:
         edge_destiny = self.edges[0]
         for edge in self.edges:
             if edge.q > edge_destiny.q:
@@ -206,6 +206,21 @@ class Agent:
         self.list_delta_q = [0]
         self.converged = False
 
+    def get_random_action(self) -> int:
+        return int(random.random() * len(self.current.edges))
+
+    def random_policy(self) -> int:
+        return int(self.get_random_action())
+
+    def greedy_policy(self) -> int:
+        # Has a chance of EPSILON to exploit
+        if random.random() > EPSILON:
+            if self.current.get_bigger_q_action() != DEFAULT_Q:
+                return self.current.get_best_action_index()
+        
+        # Otherwise, explore
+        return self.get_random_action()
+
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_name(
             str(int(random.random() * len(self.graph.vertex))))
@@ -239,29 +254,24 @@ class Agent:
                     # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
-        random_value = random.random()
-        # Has a chance EPSILON to go directly to the best action
-        if random_value > EPSILON:
-            bigger_q = self.current.get_bigger_q_action()
-            if bigger_q != DEFAULT_Q:
-                action_generated = self.current.get_best_edge_end_index()
-            else:
-                action_generated = int(random.random() *
-                                       len(self.current.edges))
-        else:
-            action_generated = int(random.random() * len(self.current.edges))
-
+        # action_generated = self.random_policy()
+        action_generated = self.greedy_policy()
         chosen_vertex = self.current.edges[action_generated].end
+        # print(f"Current: {self.current.name} -> Chosen: {chosen_vertex.name}"
+            #   f" -> Action: {action_generated}")
         self.current = chosen_vertex
         self.path.append(self.current)
         self.update_q()
 
     def train(self) -> None:
+        epoch = 0
         while not self.converged:
+            # print (f"Epoch: {self.epoch}")
             while self.current != self.graph.goal:
                 self.move()
 
             self.reset_agent()
+            epoch += 1
 
     def test(self, start_name) -> list:
         path = []
@@ -271,7 +281,7 @@ class Agent:
         path.append(self.current)
 
         while self.current != self.graph.goal:
-            action_generated = self.current.get_best_edge_end_index()
+            action_generated = self.current.get_best_action_index()
 
             path.append(self.current.edges[action_generated].end)
 
@@ -329,16 +339,19 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
         g.read_table_q(table_name=table_q_name)
 
     a = Agent(g)
-    path = a.test(start_name=start_name)
-    save_path([vertex.name for vertex in path])
+    a.train()
+    save_table_q(g, file_name=f"table_q_{goal_name}.csv")
+    # path = a.test(start_name=start_name)
+    # save_path([vertex.name for vertex in path])
 
 
 def main():
-#     full_run() # generate table_q for every vertex
-    
+    #     full_run() # generate table_q for every vertex
+
     generate_path(start_name="1", goal_name="17", is_reading_table_q=True)
-    
+
     print("Finished!")
+
 
 if __name__ == "__main__":
     main()
