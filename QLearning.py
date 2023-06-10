@@ -177,9 +177,11 @@ class Graph:
             _file = open(table_name, "r", encoding="utf-8-sig")
             for line in _file:
                 line = line.split(",")
-                q = float(line[2])
+
                 start = self.get_vertex_by_name(line[0])
                 end = self.get_vertex_by_name(line[1])
+                q = float(line[2])
+
                 for edge in start.edges:
                     if edge.end == end:
                         edge.q = q
@@ -187,12 +189,12 @@ class Graph:
             _file.close()
         except FileNotFoundError:
             print("File not found")
-            option = input("Do you want to run without table_q? (y/n) ")
-            if option == "y" or option == "Y":
-                return
-            else:
-                exit(1)
-
+            return
+            # option = input("Do you want to run without table_q? (y/n) ")
+            # if option == "y" or option == "Y":
+            #     return
+            # else:
+            #     exit(1)
 
 class Agent:
 
@@ -257,21 +259,16 @@ class Agent:
         # action_generated = self.random_policy()
         action_generated = self.greedy_policy()
         chosen_vertex = self.current.edges[action_generated].end
-        # print(f"Current: {self.current.name} -> Chosen: {chosen_vertex.name}"
-            #   f" -> Action: {action_generated}")
         self.current = chosen_vertex
         self.path.append(self.current)
         self.update_q()
 
     def train(self) -> None:
-        epoch = 0
         while not self.converged:
-            # print (f"Epoch: {self.epoch}")
             while self.current != self.graph.goal:
                 self.move()
 
             self.reset_agent()
-            epoch += 1
 
     def test(self, start_name) -> list:
         path = []
@@ -339,10 +336,13 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
         g.read_table_q(table_name=table_q_name)
 
     a = Agent(g)
-    a.train()
+
+    if not is_reading_table_q:
+        a.train()
+        
     save_table_q(g, file_name=f"table_q_{goal_name}.csv")
-    # path = a.test(start_name=start_name)
-    # save_path([vertex.name for vertex in path])
+    path = a.test(start_name=start_name)
+    save_path([vertex.name for vertex in path])
 
 
 def main():
