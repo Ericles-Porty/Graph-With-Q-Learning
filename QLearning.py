@@ -51,7 +51,9 @@ class Edge:
         self.start = start
         self.end = end
         self.weight = weight
-        self.q = q
+        # self.q = q
+        self.q = 1/weight
+
 
     def __str__(self) -> str:
         return f"{self.start.name} -> {self.end.name} ({self.weight} - {self.q})"
@@ -120,11 +122,11 @@ class Graph:
         _file = open("arestas.csv", "r", encoding="utf-8-sig")
         for line in _file:
             line = line.split(",")
-            self.add_edge(str(line[0]), str(line[1]), int(line[2]))
+            self.add_edge(str(line[0]), str(line[1]), int(line[3]))
 
         _file.close()
 
-    def get_all_vertex(self) -> list:
+    def get_all_vertex(self) -> list():
         return self.vertex
 
     def get_all_vertex_names(self) -> list:
@@ -188,7 +190,6 @@ class Graph:
 
             _file.close()
         except FileNotFoundError:
-            print("File not found")
             return
             # option = input("Do you want to run without table_q? (y/n) ")
             # if option == "y" or option == "Y":
@@ -219,9 +220,11 @@ class Agent:
         if random.random() > EPSILON:
             if self.current.get_bigger_q_action() != DEFAULT_Q:
                 return self.current.get_best_action_index()
-        
         # Otherwise, explore
         return self.get_random_action()
+
+    def greater_policy(self) -> int:
+        return self.current.get_best_action_index()
 
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_name(
@@ -230,6 +233,13 @@ class Agent:
         self.current = random_vertex
         self.path.clear()
         self.path.append(self.current)
+
+    def verify_convergence(self) -> bool:
+        if is_converged(self.list_delta_q):
+            self.converged = True
+            return True
+        return False
+    
 
     def update_q(self) -> None:
         has_change = False
@@ -244,11 +254,10 @@ class Agent:
                     if delta_q != 0:
                         has_change = True
 
-            self.epoch += 1
-
             if has_change:
                 self.list_delta_q.append(self.delta_q_total)
-
+            
+            self.epoch += 1
             if self.epoch % 5000 == 0:
                 if is_converged(self.list_delta_q):
                     self.converged = True
@@ -257,7 +266,9 @@ class Agent:
 
     def move(self) -> None:
         # action_generated = self.random_policy()
+        # action_generated = self.greater_policy()
         action_generated = self.greedy_policy()
+
         chosen_vertex = self.current.edges[action_generated].end
         self.current = chosen_vertex
         self.path.append(self.current)
@@ -299,9 +310,26 @@ def print_graph(g: Graph) -> None:
 def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
     if not os.path.exists("table_q"):
         os.mkdir("table_q")
+    
+    if file_name in os.listdir("table_q"):
+        os.remove(f"table_q/{file_name}")
+        print(f"File {file_name} already exists. It was removed.")
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
-    for edge in g.get_all_edges():
-        _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
+    # filter just the biggest q for each edge
+
+    for vertex in g.get_all_vertex():
+        bigger_q = DEFAULT_Q
+        start = vertex
+        end = vertex
+        for edge in vertex.edges:
+            if edge.q > bigger_q:
+                bigger_q = edge.q
+                start = edge.start
+                end = edge.end
+
+        _file.write(f"{start.name},{end.name},{bigger_q}\n")
+    # for edge in g.get_all_edges():
+        # _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
     _file.close()
 
 
@@ -329,17 +357,20 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
     g.set_start(start_name)
     g.set_goal(goal_name)
     g.define_reward(10.0, g.goal)
-    # g.define_reward(4.0, g.get_vertex_by_name("42"))
 
-    if is_reading_table_q:
-        table_q_name = f"table_q_{goal_name}.csv"
-        g.read_table_q(table_name=table_q_name)
+    # if is_reading_table_q:
+    #     table_q_name = f"table_q_{goal_name}.csv"
+    #     g.read_table_q(table_name=table_q_name)
 
     a = Agent(g)
 
-    if not is_reading_table_q:
-        a.train()
-        
+    a.train()
+    
+    for vertex in g.get_all_vertex():
+        print(vertex)
+        for edge in vertex.edges:
+            print(f"\t{edge}")
+        print("")
     save_table_q(g, file_name=f"table_q_{goal_name}.csv")
     path = a.test(start_name=start_name)
     save_path([vertex.name for vertex in path])
@@ -348,7 +379,7 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
 def main():
     #     full_run() # generate table_q for every vertex
 
-    generate_path(start_name="1", goal_name="17", is_reading_table_q=True)
+    generate_path(start_name="5", goal_name="45", is_reading_table_q=True)
 
     print("Finished!")
 
