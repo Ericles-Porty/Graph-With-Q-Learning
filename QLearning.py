@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 ALPHA = 0.3  # Taxa de aprendizado
 GAMMA = 0.7  # Fator de desconto
 EPSILON = 0.9  # Taxa de exploração
-
+WEIGHT_DISCOUNT = 5  # Desconto do peso da aresta
 DEFAULT_Q = 0.0
 
 
@@ -18,8 +18,14 @@ def generate_plot(dq: list) -> None:
     plt.show()
 
 
-def get_delta_q(actual_q: float, reward: float, max_q: float) -> float:
-    return ALPHA * (reward + GAMMA * max_q - actual_q)
+def get_delta_q(actual_q: float, reward: float, max_q: float,
+                weight: float) -> float:
+    return ALPHA * (
+        (reward + GAMMA * max_q - actual_q) - weight / WEIGHT_DISCOUNT)
+
+
+def belman_equation(actual_vertex, next_vertex) -> float:
+    return actual_vertex.r + GAMMA * next_vertex.get_bigger_q_action()
 
 
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
@@ -51,9 +57,7 @@ class Edge:
         self.start = start
         self.end = end
         self.weight = weight
-        # self.q = q
-        self.q = 1/weight
-
+        self.q = q
 
     def __str__(self) -> str:
         return f"{self.start.name} -> {self.end.name} ({self.weight} - {self.q})"
@@ -197,6 +201,7 @@ class Graph:
             # else:
             #     exit(1)
 
+
 class Agent:
 
     def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
@@ -239,40 +244,6 @@ class Agent:
             self.converged = True
             return True
         return False
-    
-
-    def update_q(self) -> None:
-        has_change = False
-        if len(self.path) > 1:
-            last_vertex = self.graph.get_vertex_by_name(self.path[-2].name)
-            for edge in last_vertex.edges:
-                if edge.end == self.current:
-                    delta_q = get_delta_q(edge.q, self.current.r,
-                                          self.current.get_bigger_q_action())
-                    self.delta_q_total += delta_q
-                    edge.q = edge.q + delta_q
-                    if delta_q != 0:
-                        has_change = True
-
-            if has_change:
-                self.list_delta_q.append(self.delta_q_total)
-            
-            self.epoch += 1
-            if self.epoch % 5000 == 0:
-                if is_converged(self.list_delta_q):
-                    self.converged = True
-                    save_delta_q_list(self.list_delta_q)
-                    # generate_plot(self.list_delta_q)
-
-    def move(self) -> None:
-        # action_generated = self.random_policy()
-        action_generated = self.greater_policy()
-        # action_generated = self.greedy_policy()
-
-        chosen_vertex = self.current.edges[action_generated].end
-        self.current = chosen_vertex
-        self.path.append(self.current)
-        self.update_q()
 
     def train(self) -> None:
         while not self.converged:
@@ -299,6 +270,64 @@ class Agent:
         return path
 
 
+#create a class QLearningAgent that implements Agent
+
+
+class QLearningAgent(Agent):
+
+    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
+        super().__init__(graph, delta_q_total)
+
+    def update_q_value(self, next_vertex) -> None:
+        has_change = False
+
+        for edge in self.current.edges:
+            if edge.end == next_vertex:
+                delta_q = get_delta_q(edge.q, next_vertex.r,
+                                        next_vertex.get_bigger_q_action(),
+                                        edge.weight)
+                self.delta_q_total += delta_q
+                edge.q = edge.q + delta_q
+                if delta_q != 0:
+                    has_change = True
+
+        if has_change:
+            self.list_delta_q.append(self.delta_q_total)
+
+        self.epoch += 1
+        if self.epoch % 5000 == 0:
+            if is_converged(self.list_delta_q):
+                self.converged = True
+                save_delta_q_list(self.list_delta_q)
+                generate_plot(self.list_delta_q)
+
+    def move(self) -> None:
+        action_generated = self.greedy_policy()
+        chosen_vertex = self.current.edges[action_generated].end
+
+        self.update_q_value(next_vertex=chosen_vertex)
+
+        self.current = chosen_vertex
+        self.path.append(self.current)
+
+
+class SarsaAgent(Agent):
+
+    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
+        super().__init__(graph, delta_q_total)
+
+    def update_q_value(self) -> None:
+        pass
+
+    def move(self) -> None:
+        action_generated = self.greedy_policy()
+        chosen_vertex = self.current.edges[action_generated].end
+
+        self.current = chosen_vertex
+        self.path.append(self.current)
+        self.update_q_value()
+
+
 def print_graph(g: Graph) -> None:
     for vertex in g.get_all_vertex():
         print(vertex)
@@ -310,7 +339,7 @@ def print_graph(g: Graph) -> None:
 def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
     if not os.path.exists("table_q"):
         os.mkdir("table_q")
-    
+
     if file_name in os.listdir("table_q"):
         os.remove(f"table_q/{file_name}")
         print(f"File {file_name} already exists. It was removed.")
@@ -329,7 +358,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 
         _file.write(f"{start.name},{end.name},{bigger_q}\n")
     # for edge in g.get_all_edges():
-        # _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
+    # _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
     _file.close()
 
 
@@ -344,7 +373,7 @@ def full_run():
         g.read_csv()
         g.set_start("1")
         g.set_goal(vertex.name)
-        g.define_reward(10.0, g.goal)
+        g.define_reward(10, g.goal)
         a = Agent(g)
         a.train()
         save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
@@ -362,10 +391,11 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
     #     table_q_name = f"table_q_{goal_name}.csv"
     #     g.read_table_q(table_name=table_q_name)
 
-    a = Agent(g)
+    # a = QLearningAgent(g)
+    a = QLearningAgent(g)
 
     a.train()
-    
+
     for vertex in g.get_all_vertex():
         print(vertex)
         for edge in vertex.edges:
@@ -379,7 +409,7 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
 def main():
     #     full_run() # generate table_q for every vertex
 
-    generate_path(start_name="5", goal_name="45", is_reading_table_q=True)
+    generate_path(start_name="44", goal_name="53", is_reading_table_q=True)
 
     print("Finished!")
 
