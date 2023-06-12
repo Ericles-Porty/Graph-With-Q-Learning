@@ -266,8 +266,8 @@ class Agent:
 
     def move(self) -> None:
         # action_generated = self.random_policy()
-        # action_generated = self.greater_policy()
-        action_generated = self.greedy_policy()
+        action_generated = self.greater_policy()
+        # action_generated = self.greedy_policy()
 
         chosen_vertex = self.current.edges[action_generated].end
         self.current = chosen_vertex
