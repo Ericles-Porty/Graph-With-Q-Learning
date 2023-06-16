@@ -20,8 +20,7 @@ def generate_plot(dq: list) -> None:
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
                 weight: float) -> float:
-    return ALPHA * (1/weight) *(
-        (reward + GAMMA * max_q - actual_q))
+    return ALPHA * (1 / weight) * ((reward + GAMMA * max_q - actual_q))
 
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
@@ -74,7 +73,7 @@ class Edge:
 
 class Vertex:
 
-    def __init__(self, id: int, name: str, category: str ,r=0.0) -> None:
+    def __init__(self, id: int, name: str, category: str, r=0.0) -> None:
         self.id = id
         self.name = name
         self.edges = []
@@ -268,9 +267,61 @@ class Agent:
 
             self.reset_agent()
 
-    def test(self, start_name) -> list:
+    def generate_path_interest(self, start_id, category) -> list:
         path = []
-        start = self.graph.get_vertex_by_id(start_name)
+        interest_vertexes = []
+
+        # Get all vertexes with the same category
+        for vertex in self.graph.get_all_vertex():
+            if vertex.category == category:
+                interest_vertexes.append(vertex)
+        print ("Interest vertexes:", end=" ")
+        print([i.name for i in interest_vertexes])
+
+        list_of_tables = []
+
+        # Get all tables of the interest vertexes
+        for vertex in interest_vertexes:
+            _file = open(f"table_q/table_q_{vertex.id}.csv", "r", encoding="utf-8-sig")
+            table = []
+            for line in _file:
+                line = line.split(",")
+                table.append(line)
+            list_of_tables.append(table)
+        
+        start = self.graph.get_vertex_by_id(start_id)
+        self.current = start
+        path.append(self.current)
+        # while list of interest vertexes is not empty
+        while len(interest_vertexes) > 0:
+            bigger_q = 0
+            index = 0
+            for i in range(len(list_of_tables)):
+                if float(list_of_tables[i][self.current.id][2]) > bigger_q:
+                    bigger_q = float(list_of_tables[i][self.current.id][2])
+                    index = i
+
+            # while current vertex is not the interest vertex
+            while self.current != interest_vertexes[index]:
+                self.current = self.graph.get_vertex_by_id(list_of_tables[index][self.current.id][1])
+                path.append(self.current)
+            
+            list_of_tables.pop(index)
+            interest_vertexes.pop(index)
+
+        # at the end, append the goal path
+        while self.current != self.graph.goal:  
+            action_generated = self.current.get_best_action_index()
+            self.current = self.current.edges[action_generated].end
+            path.append(self.current)
+
+        print ("Path: ", end=" ")
+        print([p.id for p in path])
+        return path
+
+    def test(self, start_id) -> list:
+        path = []
+        start = self.graph.get_vertex_by_id(start_id)
         self.current = start
 
         path.append(self.current)
@@ -362,10 +413,9 @@ class SarsaAgent(Agent):
         #         save_delta_q_list(self.list_delta_q)
         #         generate_plot(self.list_delta_q)
 
-        if self.epoch == 500000: # 300000
+        if self.epoch == 500000:  # 300000
             self.converged = True
             save_delta_q_list(self.list_delta_q)
-
 
     def move(self) -> None:
         next_action = self.greedy_policy()
@@ -391,7 +441,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 
     if file_name in os.listdir("table_q"):
         os.remove(f"table_q/{file_name}")
-        print(f"File {file_name} already exists. It was removed.")
+        # print(f"File {file_name} already exists. It was removed.")
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
 
     # filter just the biggest q for each edge
@@ -415,7 +465,9 @@ def full_run():
     g.read_csv()
     all_vertex = g.get_all_vertex()
     for vertex in all_vertex:
-        print(f"{int(all_vertex.index(vertex) / len(all_vertex) * 100)}% - Running for vertex {vertex.name} - {vertex.id} of {len(all_vertex)} ")
+        print(
+            f"{int(all_vertex.index(vertex) / len(all_vertex) * 100)}% - Running for vertex {vertex.name} - {vertex.id} of {len(all_vertex)} "
+        )
         g = Graph()
         g.read_csv()
         g.set_start("1")
@@ -427,10 +479,10 @@ def full_run():
 
 
 # create table_q.csv for only one vertex
-def generate_path(start_name, goal_name):
+def single_run(start_id, goal_name):
     g = Graph()
     g.read_csv()
-    g.set_start(start_name)
+    g.set_start(start_id)
     g.set_goal(goal_name)
     g.define_reward(10.0, g.goal)
 
@@ -439,21 +491,15 @@ def generate_path(start_name, goal_name):
 
     a.train()
 
-    # for vertex in g.get_all_vertex():
-    #     print(vertex)
-    #     for edge in vertex.edges:
-    #         print(f"\t{edge}")
-    #     print("")
-
     save_table_q(g, file_name=f"table_q_{goal_name}.csv")
-    path = a.test(start_name=start_name)
-    save_path([vertex.name for vertex in path])
+    path = a.generate_path_interest(start_id=start_id, category="Tech")
+    save_path([vertex.id for vertex in path])
 
 
 def main():
-    # full_run() # generate table_q for every vertex
+    full_run() # generate table_q for every vertex
 
-    generate_path(start_name="44", goal_name="53")
+    single_run(start_id="0", goal_name="17")
 
     print("Finished!")
 
