@@ -356,14 +356,15 @@ class SarsaAgent(Agent):
             self.list_delta_q.append(self.delta_q_total)
 
         self.epoch += 1
-        if self.epoch % 5000 == 0:
-            if is_converged(self.list_delta_q):
-                self.converged = True
-                # save_delta_q_list(self.list_delta_q)
-                generate_plot(self.list_delta_q)
+        # if self.epoch % 5000 == 0:
+        #     if is_converged(self.list_delta_q):
+        #         self.converged = True
+        #         save_delta_q_list(self.list_delta_q)
+        #         generate_plot(self.list_delta_q)
 
-        if self.epoch == 300000: # 300000
+        if self.epoch == 500000: # 300000
             self.converged = True
+            save_delta_q_list(self.list_delta_q)
 
 
     def move(self) -> None:
@@ -392,8 +393,8 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
         os.remove(f"table_q/{file_name}")
         print(f"File {file_name} already exists. It was removed.")
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
-    # filter just the biggest q for each edge
 
+    # filter just the biggest q for each edge
     for vertex in g.get_all_vertex():
         bigger_q = DEFAULT_Q
         start = vertex
@@ -404,9 +405,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
                 start = edge.start
                 end = edge.end
 
-        _file.write(f"{start.name},{end.name},{bigger_q}\n")
-    # for edge in g.get_all_edges():
-    # _file.write(f"{edge.start.name},{edge.end.name},{edge.q}\n")
+        _file.write(f"{start.id},{end.id},{bigger_q}\n")
     _file.close()
 
 
@@ -416,48 +415,45 @@ def full_run():
     g.read_csv()
     all_vertex = g.get_all_vertex()
     for vertex in all_vertex:
-        print(f"Running for vertex {vertex.name}")
+        print(f"{int(all_vertex.index(vertex) / len(all_vertex) * 100)}% - Running for vertex {vertex.name} - {vertex.id} of {len(all_vertex)} ")
         g = Graph()
         g.read_csv()
         g.set_start("1")
-        g.set_goal(vertex.name)
+        g.set_goal(vertex.id)
         g.define_reward(10, g.goal)
-        a = Agent(g)
+        a = QLearningAgent(g)
         a.train()
-        save_table_q(g, file_name=f"table_q_{vertex.name}.csv")
+        save_table_q(g, file_name=f"table_q_{vertex.id}.csv")
 
 
 # create table_q.csv for only one vertex
-def generate_path(start_name, goal_name, is_reading_table_q=False):
+def generate_path(start_name, goal_name):
     g = Graph()
     g.read_csv()
     g.set_start(start_name)
     g.set_goal(goal_name)
     g.define_reward(10.0, g.goal)
 
-    # if is_reading_table_q:
-    #     table_q_name = f"table_q_{goal_name}.csv"
-    #     g.read_table_q(table_name=table_q_name)
-
-    a = QLearningAgent(g)
-    # a = SarsaAgent(g)
+    # a = QLearningAgent(g)
+    a = SarsaAgent(g)
 
     a.train()
 
-    for vertex in g.get_all_vertex():
-        print(vertex)
-        for edge in vertex.edges:
-            print(f"\t{edge}")
-        print("")
+    # for vertex in g.get_all_vertex():
+    #     print(vertex)
+    #     for edge in vertex.edges:
+    #         print(f"\t{edge}")
+    #     print("")
+
     save_table_q(g, file_name=f"table_q_{goal_name}.csv")
     path = a.test(start_name=start_name)
     save_path([vertex.name for vertex in path])
 
 
 def main():
-    #     full_run() # generate table_q for every vertex
+    # full_run() # generate table_q for every vertex
 
-    generate_path(start_name="44", goal_name="53", is_reading_table_q=True)
+    generate_path(start_name="44", goal_name="53")
 
     print("Finished!")
 
@@ -468,5 +464,4 @@ if __name__ == "__main__":
 # -*- coding: utf-8 -*-
 """
 TODO: APLICAR VIES
-TODO: APLICAR ATRIBUTOS DE DISTANCIA
 """
