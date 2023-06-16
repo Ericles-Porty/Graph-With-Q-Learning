@@ -20,8 +20,14 @@ def generate_plot(dq: list) -> None:
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
                 weight: float) -> float:
-    return ALPHA * (
-        (reward + GAMMA * max_q - actual_q) - weight / WEIGHT_DISCOUNT)
+    return ALPHA * (1/weight) *(
+        (reward + GAMMA * max_q - actual_q))
+
+
+def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
+                      weight: float) -> float:
+    return ALPHA * (reward + GAMMA * next_q - actual_q)
+    # return ALPHA * (1/weight) (reward + GAMMA * next_q - actual_q)
 
 
 def belman_equation(actual_vertex, next_vertex) -> float:
@@ -32,8 +38,11 @@ def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
     # verify if the last 5 values of delta q are equal
     if len(delta_q_list) > match_numbers:
         for i in range(1, match_numbers):
+            # print (delta_q_list[-i], end=" ")
             if delta_q_list[-1] != delta_q_list[-i]:
+                # print()
                 return False
+        # print()
         return True
 
 
@@ -65,10 +74,11 @@ class Edge:
 
 class Vertex:
 
-    def __init__(self, id: int, name: str, r=0.0) -> None:
+    def __init__(self, id: int, name: str, category: str ,r=0.0) -> None:
         self.id = id
         self.name = name
         self.edges = []
+        self.category = category
         self.r = r
 
     def add_edge(self, edge: Edge) -> None:
@@ -119,7 +129,7 @@ class Graph:
         _file = open("vertices.csv", "r", encoding="utf-8")
         for line in _file:
             line = line.split(",")
-            self.add_vertex(Vertex(int(line[0]), str(line[0])))
+            self.add_vertex(Vertex(int(line[0]), str(line[1]), str(line[4])))
 
         _file.close()
 
@@ -156,6 +166,12 @@ class Graph:
     def add_vertex(self, vertex: Vertex) -> None:
         self.vertex.append(vertex)
 
+    def get_vertex_by_id(self, id: str) -> Vertex:
+        for vertex in self.vertex:
+            if str(vertex.id) == str(id):
+                return vertex
+        raise Exception(f"Vertex with id {id} not found")
+
     def get_vertex_by_name(self, name: str) -> Vertex:
         for vertex in self.vertex:
             if vertex.name == name:
@@ -163,14 +179,14 @@ class Graph:
         raise Exception(f"Vertex with name {name} not found")
 
     def set_goal(self, goal: str) -> None:
-        self.goal = self.get_vertex_by_name(goal)
+        self.goal = self.get_vertex_by_id(goal)
 
     def set_start(self, start: str) -> None:
-        self.start = self.get_vertex_by_name(start)
+        self.start = self.get_vertex_by_id(start)
 
     def add_edge(self, start: str, end: str, weight: int) -> None:
-        start = self.get_vertex_by_name(start)
-        end = self.get_vertex_by_name(end)
+        start = self.get_vertex_by_id(start)
+        end = self.get_vertex_by_id(end)
         start.add_edge(Edge(start, end, weight))
         end.add_edge(Edge(end, start, weight))
 
@@ -184,8 +200,8 @@ class Graph:
             for line in _file:
                 line = line.split(",")
 
-                start = self.get_vertex_by_name(line[0])
-                end = self.get_vertex_by_name(line[1])
+                start = self.get_vertex_by_id(line[0])
+                end = self.get_vertex_by_id(line[1])
                 q = float(line[2])
 
                 for edge in start.edges:
@@ -232,7 +248,7 @@ class Agent:
         return self.current.get_best_action_index()
 
     def reset_agent(self) -> None:
-        random_vertex = self.graph.get_vertex_by_name(
+        random_vertex = self.graph.get_vertex_by_id(
             str(int(random.random() * len(self.graph.vertex))))
 
         self.current = random_vertex
@@ -254,7 +270,7 @@ class Agent:
 
     def test(self, start_name) -> list:
         path = []
-        start = self.graph.get_vertex_by_name(start_name)
+        start = self.graph.get_vertex_by_id(start_name)
         self.current = start
 
         path.append(self.current)
@@ -284,8 +300,8 @@ class QLearningAgent(Agent):
         for edge in self.current.edges:
             if edge.end == next_vertex:
                 delta_q = get_delta_q(edge.q, next_vertex.r,
-                                        next_vertex.get_bigger_q_action(),
-                                        edge.weight)
+                                      next_vertex.get_bigger_q_action(),
+                                      edge.weight)
                 self.delta_q_total += delta_q
                 edge.q = edge.q + delta_q
                 if delta_q != 0:
@@ -298,8 +314,8 @@ class QLearningAgent(Agent):
         if self.epoch % 5000 == 0:
             if is_converged(self.list_delta_q):
                 self.converged = True
-                save_delta_q_list(self.list_delta_q)
-                generate_plot(self.list_delta_q)
+                # save_delta_q_list(self.list_delta_q)
+                # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         action_generated = self.greedy_policy()
@@ -316,16 +332,48 @@ class SarsaAgent(Agent):
     def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
         super().__init__(graph, delta_q_total)
 
-    def update_q_value(self) -> None:
-        pass
+    def update_q_value(self, next_vertex) -> None:
+        has_change = False
+
+        for edge in self.current.edges:
+            if edge.end == next_vertex:
+
+                old_current = self.current
+                self.current = next_vertex
+                next_action = self.greedy_policy()
+                self.current = old_current
+
+                next_edge = next_vertex.edges[next_action]
+
+                delta_q = get_delta_q_sarsa(edge.q, next_vertex.r, next_edge.q,
+                                            edge.weight)
+                self.delta_q_total += delta_q
+                edge.q = edge.q + delta_q
+                if delta_q != 0:
+                    has_change = True
+
+        if has_change:
+            self.list_delta_q.append(self.delta_q_total)
+
+        self.epoch += 1
+        if self.epoch % 5000 == 0:
+            if is_converged(self.list_delta_q):
+                self.converged = True
+                # save_delta_q_list(self.list_delta_q)
+                generate_plot(self.list_delta_q)
+
+        if self.epoch == 300000: # 300000
+            self.converged = True
+
 
     def move(self) -> None:
-        action_generated = self.greedy_policy()
-        chosen_vertex = self.current.edges[action_generated].end
+        next_action = self.greedy_policy()
+        next_vertex = self.current.edges[next_action].end
 
-        self.current = chosen_vertex
+        self.update_q_value(next_vertex)
+
+        self.current = next_vertex
         self.path.append(self.current)
-        self.update_q_value()
 
 
 def print_graph(g: Graph) -> None:
@@ -391,8 +439,8 @@ def generate_path(start_name, goal_name, is_reading_table_q=False):
     #     table_q_name = f"table_q_{goal_name}.csv"
     #     g.read_table_q(table_name=table_q_name)
 
-    # a = QLearningAgent(g)
     a = QLearningAgent(g)
+    # a = SarsaAgent(g)
 
     a.train()
 
@@ -419,7 +467,6 @@ if __name__ == "__main__":
 
 # -*- coding: utf-8 -*-
 """
-TODO: VERIFICAR CONVERGÊNCIA
 TODO: APLICAR VIES
 TODO: APLICAR ATRIBUTOS DE DISTANCIA
 """
