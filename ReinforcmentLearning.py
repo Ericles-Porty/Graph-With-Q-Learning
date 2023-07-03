@@ -6,8 +6,12 @@ import matplotlib.pyplot as plt
 ALPHA = 0.3  # Taxa de aprendizado
 GAMMA = 0.7  # Fator de desconto
 EPSILON = 0.9  # Taxa de exploração
-WEIGHT_DISCOUNT = 5  # Desconto do peso da aresta
 DEFAULT_Q = 0.0
+
+
+def get_normalized_distance(distance: float, max_distance: float,
+                            min_distance: float) -> float:
+    return (distance - min_distance) / (max_distance - min_distance)
 
 
 def generate_plot(dq: list) -> None:
@@ -19,29 +23,23 @@ def generate_plot(dq: list) -> None:
 
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
-                weight: float) -> float:
-    return ALPHA * (1 / weight) * ((reward + GAMMA * max_q - actual_q))
+                normalized_distance: float) -> float:
+    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
+    # return ALPHA * (reward + GAMMA * max_q - actual_q)
+
 
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
-                      weight: float) -> float:
-    return ALPHA * (reward + GAMMA * next_q - actual_q)
-    # return ALPHA * (1/weight) (reward + GAMMA * next_q - actual_q)
-
-
-def belman_equation(actual_vertex, next_vertex) -> float:
-    return actual_vertex.r + GAMMA * next_vertex.get_bigger_q_action()
+                      normalized_distance: float) -> float:
+    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
 
 
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
     # verify if the last 5 values of delta q are equal
     if len(delta_q_list) > match_numbers:
         for i in range(1, match_numbers):
-            # print (delta_q_list[-i], end=" ")
             if delta_q_list[-1] != delta_q_list[-i]:
-                # print()
                 return False
-        # print()
         return True
 
 
@@ -61,14 +59,11 @@ def save_path(path: list) -> None:
 
 class Edge:
 
-    def __init__(self, start, end, weight: int, q=DEFAULT_Q) -> None:
+    def __init__(self, start, end, distance: int, q=DEFAULT_Q) -> None:
         self.start = start
         self.end = end
-        self.weight = weight
+        self.distance = distance
         self.q = q
-
-    def __str__(self) -> str:
-        return f"{self.start.name} -> {self.end.name} ({self.weight} - {self.q})"
 
 
 class Vertex:
@@ -86,12 +81,6 @@ class Vertex:
                 return
         self.edges.append(edge)
 
-    def get_vertex_by_name(self, name: str) -> "Vertex":
-        for edge in self.edges:
-            if edge.end.name == name:
-                return edge.end
-        return None
-
     def get_bigger_q_action(self) -> float:
         bigger_q = DEFAULT_Q
         for edge in self.edges:
@@ -106,88 +95,84 @@ class Vertex:
                 edge_destiny = edge
         return self.edges.index(edge_destiny)
 
-    def get_best_edge_end(self):
-        edge_destiny = self.edges[0]
-        for edge in self.edges:
-            if edge.q > edge_destiny.q:
-                edge_destiny = edge
-        return edge_destiny.end
-
-    def __str__(self) -> str:
-        return f"Vertex: {self.name} | R={self.r}"
-
 
 class Graph:
 
     def __init__(self) -> None:
-        self.vertex = []
+        self.vertices = []
         self.start = None
         self.goal = None
+        self.min_distance = 9999999
+        self.max_distance = 0
 
     def read_csv(self) -> None:
         _file = open("vertices.csv", "r", encoding="utf-8")
         for line in _file:
             line = line.split(",")
-            self.add_vertex(Vertex(int(line[0]), str(line[1]), str(line[4])))
+
+            vertex_id = int(line[0])
+            name = str(line[1])
+            category = str(line[4])
+
+            self.add_vertex(Vertex(vertex_id, name, category))
 
         _file.close()
 
         _file = open("arestas.csv", "r", encoding="utf-8-sig")
         for line in _file:
             line = line.split(",")
-            self.add_edge(str(line[0]), str(line[1]), int(line[3]))
+
+            start = str(line[0])
+            end = str(line[1])
+            distance = int(line[3])
+
+            if distance < self.min_distance:
+                self.min_distance = distance
+            if distance > self.max_distance:
+                self.max_distance = distance
+
+            self.add_edge(start, end, distance)
 
         _file.close()
 
-    def get_all_vertex(self) -> list():
-        return self.vertex
-
-    def get_all_vertex_names(self) -> list:
-        names = []
-        for vertex in self.vertex:
-            names.append(vertex.name)
-        return names
+    def get_all_vertices(self) -> list():
+        return self.vertices
 
     def get_all_edges(self) -> list:
         edges = []
-        for vertex in self.vertex:
+        for vertex in self.vertices:
             for edge in vertex.edges:
                 edges.append(edge)
         return edges
 
-    def get_all_edges_names(self) -> list:
-        edges = []
-        for vertex in self.vertex:
-            for edge in vertex.edges:
-                edges.append(f"{edge.start.name} -> {edge.end.name}")
-        return edges
-
     def add_vertex(self, vertex: Vertex) -> None:
-        self.vertex.append(vertex)
+        self.vertices.append(vertex)
 
-    def get_vertex_by_id(self, id: str) -> Vertex:
-        for vertex in self.vertex:
+    def get_vertex_by_id(self, id: int) -> Vertex:
+        for vertex in self.vertices:
+            # print(vertex.id, id)
             if str(vertex.id) == str(id):
                 return vertex
         raise Exception(f"Vertex with id {id} not found")
 
     def get_vertex_by_name(self, name: str) -> Vertex:
-        for vertex in self.vertex:
+        for vertex in self.vertices:
             if vertex.name == name:
                 return vertex
         raise Exception(f"Vertex with name {name} not found")
 
-    def set_goal(self, goal: str) -> None:
-        self.goal = self.get_vertex_by_id(goal)
+    def set_goal(self, goal_vertex: Vertex) -> None:
+        self.goal = goal_vertex
+        # self.goal = self.get_vertex_by_id(goal)
 
-    def set_start(self, start: str) -> None:
-        self.start = self.get_vertex_by_id(start)
+    def set_start(self, start_vertex: Vertex) -> None:
+        self.start = start_vertex
 
-    def add_edge(self, start: str, end: str, weight: int) -> None:
+    def add_edge(self, start: int, end: int, distance: int) -> None:
         start = self.get_vertex_by_id(start)
         end = self.get_vertex_by_id(end)
-        start.add_edge(Edge(start, end, weight))
-        end.add_edge(Edge(end, start, weight))
+        start.add_edge(Edge(start, end, distance))
+        end.add_edge(Edge(end, start, distance))
 
     def define_reward(self, reward: float, vertex: Vertex) -> None:
         vertex.r = reward
@@ -248,7 +233,7 @@ class Agent:
 
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_id(
-            str(int(random.random() * len(self.graph.vertex))))
+            str(int(random.random() * len(self.graph.vertices))))
 
         self.current = random_vertex
         self.path.clear()
@@ -267,28 +252,31 @@ class Agent:
 
             self.reset_agent()
 
-    def generate_path_interest(self, start_id, category) -> list:
+    def generate_path_interest(self, start_id, categories: list) -> list:
         path = []
         interest_vertexes = []
 
         # Get all vertexes with the same category
-        for vertex in self.graph.get_all_vertex():
-            if vertex.category == category:
-                interest_vertexes.append(vertex)
-        print ("Interest vertexes:", end=" ")
-        print([i.name for i in interest_vertexes])
+        for category in categories:
+            for vertex in self.graph.get_all_vertices():
+                if vertex.category == category:
+                    interest_vertexes.append(vertex)
+            print("Interest vertexes:", end=" ")
+            print([i.name for i in interest_vertexes])
 
         list_of_tables = []
 
         # Get all tables of the interest vertexes
         for vertex in interest_vertexes:
-            _file = open(f"table_q/table_q_{vertex.id}.csv", "r", encoding="utf-8-sig")
+            _file = open(f"table_q/table_q_{vertex.id}.csv",
+                         "r",
+                         encoding="utf-8-sig")
             table = []
             for line in _file:
                 line = line.split(",")
                 table.append(line)
             list_of_tables.append(table)
-        
+
         start = self.graph.get_vertex_by_id(start_id)
         self.current = start
         path.append(self.current)
@@ -303,23 +291,25 @@ class Agent:
 
             # while current vertex is not the interest vertex
             while self.current != interest_vertexes[index]:
-                self.current = self.graph.get_vertex_by_id(list_of_tables[index][self.current.id][1])
+                self.current = self.graph.get_vertex_by_id(
+                    list_of_tables[index][self.current.id][1])
                 path.append(self.current)
-            
+
             list_of_tables.pop(index)
             interest_vertexes.pop(index)
 
         # at the end, append the goal path
-        while self.current != self.graph.goal:  
+        while self.current != self.graph.goal:
             action_generated = self.current.get_best_action_index()
             self.current = self.current.edges[action_generated].end
             path.append(self.current)
 
-        print ("Path: ", end=" ")
+        print("Path: ", end=" ")
         print([p.id for p in path])
+        print("Quantidade de passos: ",len(path))
         return path
 
-    def test(self, start_id) -> list:
+    def generate_fast_path(self, start_id) -> list:
         path = []
         start = self.graph.get_vertex_by_id(start_id)
         self.current = start
@@ -350,9 +340,13 @@ class QLearningAgent(Agent):
 
         for edge in self.current.edges:
             if edge.end == next_vertex:
+                normalized_distance = get_normalized_distance(
+                    edge.distance, self.graph.min_distance,
+                    self.graph.max_distance)
+
                 delta_q = get_delta_q(edge.q, next_vertex.r,
                                       next_vertex.get_bigger_q_action(),
-                                      edge.weight)
+                                      normalized_distance)
                 self.delta_q_total += delta_q
                 edge.q = edge.q + delta_q
                 if delta_q != 0:
@@ -396,8 +390,12 @@ class SarsaAgent(Agent):
 
                 next_edge = next_vertex.edges[next_action]
 
+                normalized_distance = get_normalized_distance(
+                    edge.distance, self.graph.min_distance,
+                    self.graph.max_distance)
+
                 delta_q = get_delta_q_sarsa(edge.q, next_vertex.r, next_edge.q,
-                                            edge.weight)
+                                            normalized_distance)
                 self.delta_q_total += delta_q
                 edge.q = edge.q + delta_q
                 if delta_q != 0:
@@ -407,15 +405,11 @@ class SarsaAgent(Agent):
             self.list_delta_q.append(self.delta_q_total)
 
         self.epoch += 1
-        # if self.epoch % 5000 == 0:
-        #     if is_converged(self.list_delta_q):
-        #         self.converged = True
-        #         save_delta_q_list(self.list_delta_q)
-        #         generate_plot(self.list_delta_q)
 
-        if self.epoch == 500000:  # 300000
+        if self.epoch == 500000:
             self.converged = True
-            save_delta_q_list(self.list_delta_q)
+            # save_delta_q_list(self.list_delta_q)
+            # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         next_action = self.greedy_policy()
@@ -428,7 +422,7 @@ class SarsaAgent(Agent):
 
 
 def print_graph(g: Graph) -> None:
-    for vertex in g.get_all_vertex():
+    for vertex in g.get_all_vertices():
         print(vertex)
         for edge in vertex.edges:
             print(f"\t{edge}")
@@ -445,7 +439,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
 
     # filter just the biggest q for each edge
-    for vertex in g.get_all_vertex():
+    for vertex in g.get_all_vertices():
         bigger_q = DEFAULT_Q
         start = vertex
         end = vertex
@@ -463,18 +457,22 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 def full_run():
     g = Graph()
     g.read_csv()
-    all_vertex = g.get_all_vertex()
+    all_vertex = g.get_all_vertices()
     for vertex in all_vertex:
         print(
-            f"{int(all_vertex.index(vertex) / len(all_vertex) * 100)}% - Running for vertex {vertex.name} - {vertex.id} of {len(all_vertex)} "
+            f"{int(all_vertex.index(vertex) / len(all_vertex) * 100)}% - Running for vertex {vertex.name} - {vertex.id + 1} of {len(all_vertex)} "
         )
         g = Graph()
         g.read_csv()
-        g.set_start("1")
-        g.set_goal(vertex.id)
+        start_vertex = g.get_vertex_by_id(1)
+        g.set_start(start_vertex)
+        goal_vertex = g.get_vertex_by_id(vertex.id)
+        g.set_goal(goal_vertex=goal_vertex)
         g.define_reward(10, g.goal)
+
         a = QLearningAgent(g)
         a.train()
+
         save_table_q(g, file_name=f"table_q_{vertex.id}.csv")
 
 
@@ -482,8 +480,10 @@ def full_run():
 def single_run(start_id, goal_name):
     g = Graph()
     g.read_csv()
-    g.set_start(start_id)
-    g.set_goal(goal_name)
+    start_vertex = g.get_vertex_by_id(start_id)
+    g.set_start(start_vertex)
+    goal_vertex = g.get_vertex_by_id(goal_name)
+    g.set_goal(goal_vertex)
     g.define_reward(10.0, g.goal)
 
     # a = QLearningAgent(g)
@@ -492,12 +492,13 @@ def single_run(start_id, goal_name):
     a.train()
 
     save_table_q(g, file_name=f"table_q_{goal_name}.csv")
-    path = a.generate_path_interest(start_id=start_id, category="Tech")
+    # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
+    path = a.generate_path_interest(start_id=start_id, categories=["Tech"])
     save_path([vertex.id for vertex in path])
 
 
 def main():
-    full_run() # generate table_q for every vertex
+    full_run()  # generate table_q for every vertex
 
     single_run(start_id="0", goal_name="17")
 
