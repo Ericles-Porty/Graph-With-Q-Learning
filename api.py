@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+
 import os
 import time
 import random
@@ -24,14 +26,15 @@ def generate_plot(dq: list) -> None:
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
                 normalized_distance: float) -> float:
-    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
+    return (ALPHA +
+            (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
     # return ALPHA * (reward + GAMMA * max_q - actual_q)
-
 
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
                       normalized_distance: float) -> float:
-    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
+    return (ALPHA +
+            (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
 
 
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
@@ -256,13 +259,17 @@ class Agent:
         path = []
         interest_vertexes = []
 
+        print("Categories:", end=" ")
+        print(categories)
+
         # Get all vertexes with the same category
         for category in categories:
             for vertex in self.graph.get_all_vertices():
                 if vertex.category == category:
                     interest_vertexes.append(vertex)
-            print("Interest vertexes:", end=" ")
-            print([i.name for i in interest_vertexes])
+
+        print("Interest vertexes:", end=" ")
+        print([i.name for i in interest_vertexes])
 
         list_of_tables = []
 
@@ -306,7 +313,8 @@ class Agent:
 
         print("Path: ", end=" ")
         print([p.id for p in path])
-        print("Quantidade de passos: ",len(path))
+        print([p.name for p in path])
+        print("Quantidade de passos: ", len(path))
         return path
 
     def generate_fast_path(self, start_id) -> list:
@@ -477,7 +485,7 @@ def full_run():
 
 
 # create table_q.csv for only one vertex
-def single_run(start_id, goal_id):
+def get_path(start_id, goal_id, interest_categories):
     g = Graph()
     g.read_csv()
     start_vertex = g.get_vertex_by_id(start_id)
@@ -490,25 +498,32 @@ def single_run(start_id, goal_id):
     # a = SarsaAgent(g)
 
     a.train()
-
     save_table_q(g, file_name=f"table_q_{goal_id}.csv")
-    # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
-    path = a.generate_path_interest(start_id=start_id, categories=["Tech"])
+    if interest_categories is not None:
+        categories = interest_categories.split(",")
+        path = a.generate_path_interest(start_id=start_id, categories=categories)
+        # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
+    else:
+        path = a.generate_fast_path(start_id=start_id)
     save_path([vertex.id for vertex in path])
+    return path
 
 
-def main():
-    full_run()  # generate table_q for every vertex
 
-    single_run(start_id="0", goal_id="17")
-
-    print("Finished!")
+app = FastAPI()
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
 
-# -*- coding: utf-8 -*-
-"""
-TODO: MOBILE
-"""
+
+@app.get("/path/{id_origin}/{id_target}")
+async def req_get_path(id_origin: int,
+                   id_target: int,
+                   interests: str | None = None):
+    full_run()    
+    
+    path = get_path(start_id=id_origin, goal_id=id_target, interest_categories=interests)
+
+    return {"path": [vertex.id for vertex in path]}
