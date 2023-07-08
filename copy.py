@@ -1,11 +1,7 @@
-from fastapi import FastAPI, Query
-from fastapi.responses import RedirectResponse
-from fastapi.openapi.utils import get_openapi
-from pydantic import BaseModel
-from typing import Literal
-
 import os
+import time
 import random
+import matplotlib.pyplot as plt
 
 ALPHA = 0.3  # Taxa de aprendizado
 GAMMA = 0.7  # Fator de desconto
@@ -13,27 +9,29 @@ EPSILON = 0.9  # Taxa de exploração
 DEFAULT_Q = 0.0
 
 
-list_of_interests_available = [
-    "Tech", "Food", "Entertainment", "Fashion", "Market", "Automotive",
-    "Drink", "Fit", "Games"
-]
-
 def get_normalized_distance(distance: float, max_distance: float,
                             min_distance: float) -> float:
     return (distance - min_distance) / (max_distance - min_distance)
 
 
+def generate_plot(dq: list) -> None:
+    plt.plot(dq)
+    plt.title("Gráfico de convergência do aprendizado")
+    plt.ylabel("Delta Q Total")
+    plt.xlabel("Episódios")
+    plt.show()
+
+
 def get_delta_q(actual_q: float, reward: float, max_q: float,
                 normalized_distance: float) -> float:
-    return (ALPHA +
-            (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
+    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
     # return ALPHA * (reward + GAMMA * max_q - actual_q)
+
 
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
                       normalized_distance: float) -> float:
-    return (ALPHA +
-            (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
+    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
 
 
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
@@ -258,17 +256,13 @@ class Agent:
         path = []
         interest_vertexes = []
 
-        print("Categories:", end=" ")
-        print(categories)
-
         # Get all vertexes with the same category
         for category in categories:
             for vertex in self.graph.get_all_vertices():
                 if vertex.category == category:
                     interest_vertexes.append(vertex)
-
-        print("Interest vertexes:", end=" ")
-        print([i.name for i in interest_vertexes])
+            print("Interest vertexes:", end=" ")
+            print([i.name for i in interest_vertexes])
 
         list_of_tables = []
 
@@ -312,8 +306,7 @@ class Agent:
 
         print("Path: ", end=" ")
         print([p.id for p in path])
-        print([p.name for p in path])
-        print("Quantidade de passos: ", len(path))
+        print("Quantidade de passos: ",len(path))
         return path
 
     def generate_fast_path(self, start_id) -> list:
@@ -366,6 +359,8 @@ class QLearningAgent(Agent):
         if self.epoch % 5000 == 0:
             if is_converged(self.list_delta_q):
                 self.converged = True
+                # save_delta_q_list(self.list_delta_q)
+                # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         action_generated = self.greedy_policy()
@@ -413,6 +408,8 @@ class SarsaAgent(Agent):
 
         if self.epoch == 500000:
             self.converged = True
+            # save_delta_q_list(self.list_delta_q)
+            # generate_plot(self.list_delta_q)
 
     def move(self) -> None:
         next_action = self.greedy_policy()
@@ -436,9 +433,9 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
     if not os.path.exists("table_q"):
         os.mkdir("table_q")
 
-    # if file_name in os.listdir("table_q"):
-    #     os.remove(f"table_q/{file_name}")
-
+    if file_name in os.listdir("table_q"):
+        os.remove(f"table_q/{file_name}")
+        # print(f"File {file_name} already exists. It was removed.")
     _file = open(f"table_q/{file_name}", "w", encoding="utf-8")
 
     # filter just the biggest q for each edge
@@ -457,7 +454,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 
 
 # create table q for every vertex
-def full_run(Algorithm):
+def full_run():
     g = Graph()
     g.read_csv()
     all_vertex = g.get_all_vertices()
@@ -473,13 +470,14 @@ def full_run(Algorithm):
         g.set_goal(goal_vertex=goal_vertex)
         g.define_reward(10, g.goal)
 
-        a = Algorithm(g)
+        a = QLearningAgent(g)
         a.train()
 
         save_table_q(g, file_name=f"table_q_{vertex.id}.csv")
 
 
-def get_path(start_id, goal_id, interest_categories, Algorithm: Agent):
+# create table_q.csv for only one vertex
+def single_run(start_id, goal_id):
     g = Graph()
     g.read_csv()
     start_vertex = g.get_vertex_by_id(start_id)
@@ -488,73 +486,29 @@ def get_path(start_id, goal_id, interest_categories, Algorithm: Agent):
     g.set_goal(goal_vertex)
     g.define_reward(10.0, g.goal)
 
-    a = Algorithm(g)
+    a = QLearningAgent(g)
+    # a = SarsaAgent(g)
 
     a.train()
+
     save_table_q(g, file_name=f"table_q_{goal_id}.csv")
-    if interest_categories is not None:
-        categories = interest_categories.split(",")
-        path = a.generate_path_interest(start_id=start_id,
-                                        categories=categories)
-        # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
-    else:
-        path = a.generate_fast_path(start_id=start_id)
+    # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
+    path = a.generate_path_interest(start_id=start_id, categories=["Tech"])
     save_path([vertex.id for vertex in path])
-    return path
 
 
-full_run(QLearningAgent)
-app = FastAPI()
+def main():
+    full_run()  # generate table_q for every vertex
 
+    single_run(start_id="0", goal_id="17")
 
+    print("Finished!")
 
-@app.get("/path/{id_origin}/{id_target}", tags=["Path"])
-async def get_path_request( id_origin: int, id_target: int, 
-                            algorithm: Literal["QLearning", "Sarsa"] = "QLearning",
-                            interests: str | None = Query(
-                                None,
-                                description="Uma lista de palavras separadas por vírgula. Interesses disponíveis: "
-                                + ", ".join(list_of_interests_available))):
-
-    if algorithm == "QLearning":
-        algorithm = QLearningAgent
-    elif algorithm == "Sarsa":
-        algorithm = SarsaAgent
-    else:
-        return {"error": "Invalid algorithm"}
-    
-
-    path = get_path(start_id=id_origin,
-                    goal_id=id_target,
-                    interest_categories=interests,
-                    Algorithm=algorithm)
-
-    return {"path": [vertex.id for vertex in path]}
-
-
-@app.get("/", include_in_schema=False)
-async def root():
-    return RedirectResponse(url="/docs")
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title="Api for Bias Pathfinding",
-        version="1.0.0",
-        description=
-        "Essa é uma api para encontrar caminhos com viés em ambientes indoor.",
-        routes=app.routes,
-    )
-    openapi_schema["info"]["x-logo"] = {
-        "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"
-    }
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-
-app.openapi = custom_openapi
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    main()
+
+# -*- coding: utf-8 -*-
+"""
+TODO: MOBILE
+"""

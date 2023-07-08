@@ -1,7 +1,5 @@
 import os
-import time
 import random
-import matplotlib.pyplot as plt
 
 ALPHA = 0.3  # Taxa de aprendizado
 GAMMA = 0.7  # Fator de desconto
@@ -9,17 +7,14 @@ EPSILON = 0.9  # Taxa de exploração
 DEFAULT_Q = 0.0
 
 
+list_of_interests_available = [
+    "Tech", "Food", "Entertainment", "Fashion", "Market", "Automotive",
+    "Drink", "Fit", "Games"
+]
+
 def get_normalized_distance(distance: float, max_distance: float,
                             min_distance: float) -> float:
     return (distance - min_distance) / (max_distance - min_distance)
-
-
-def generate_plot(dq: list) -> None:
-    plt.plot(dq)
-    plt.title("Gráfico de convergência do aprendizado")
-    plt.ylabel("Delta Q Total")
-    plt.xlabel("Episódios")
-    plt.show()
 
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
@@ -497,18 +492,5 @@ def single_run(start_id, goal_id):
     save_path([vertex.id for vertex in path])
 
 
-def main():
-    full_run()  # generate table_q for every vertex
-
-    single_run(start_id="0", goal_id="17")
-
-    print("Finished!")
-
-
-if __name__ == "__main__":
-    main()
-
-# -*- coding: utf-8 -*-
-"""
 TODO: MOBILE
 """
