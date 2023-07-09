@@ -7,11 +7,6 @@ EPSILON = 0.9  # Taxa de exploração
 DEFAULT_Q = 0.0
 
 
-list_of_interests_available = [
-    "Tech", "Food", "Entertainment", "Fashion", "Market", "Automotive",
-    "Drink", "Fit", "Games"
-]
-
 def get_normalized_distance(distance: float, max_distance: float,
                             min_distance: float) -> float:
     return (distance - min_distance) / (max_distance - min_distance)
@@ -29,8 +24,8 @@ def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
     return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
 
 
-def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
     # verify if the last 5 values of delta q are equal
+def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
     if len(delta_q_list) > match_numbers:
         for i in range(1, match_numbers):
             if delta_q_list[-1] != delta_q_list[-i]:
@@ -38,6 +33,7 @@ def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
         return True
 
 
+# TODO APAGAR ISSO DPS
 def save_delta_q_list(dq: list) -> None:
     _file = open("delta_q.csv", "w", encoding="utf-8")
     for i in dq:
@@ -47,8 +43,14 @@ def save_delta_q_list(dq: list) -> None:
 
 def save_path(path: list) -> None:
     _file = open("path.csv", "w", encoding="utf-8")
-    p = [str(i) for i in path]
-    _file.write(",".join(p))
+
+    # convert int to str
+    path = [str(p) for p in path]
+
+    # separate path with comma
+    path = ",".join(path)
+
+    _file.write(path)
     _file.close()
 
 
@@ -102,6 +104,7 @@ class Graph:
 
     def read_csv(self) -> None:
         _file = open("vertices.csv", "r", encoding="utf-8")
+
         for line in _file:
             line = line.split(",")
 
@@ -114,6 +117,7 @@ class Graph:
         _file.close()
 
         _file = open("arestas.csv", "r", encoding="utf-8-sig")
+
         for line in _file:
             line = line.split(",")
 
@@ -123,6 +127,7 @@ class Graph:
 
             if distance < self.min_distance:
                 self.min_distance = distance
+
             if distance > self.max_distance:
                 self.max_distance = distance
 
@@ -145,7 +150,6 @@ class Graph:
 
     def get_vertex_by_id(self, id: int) -> Vertex:
         for vertex in self.vertices:
-            # print(vertex.id, id)
             if str(vertex.id) == str(id):
                 return vertex
         raise Exception(f"Vertex with id {id} not found")
@@ -156,12 +160,14 @@ class Graph:
                 return vertex
         raise Exception(f"Vertex with name {name} not found")
 
+
     def set_goal(self, goal_vertex: Vertex) -> None:
         self.goal = goal_vertex
-        # self.goal = self.get_vertex_by_id(goal)
+
 
     def set_start(self, start_vertex: Vertex) -> None:
         self.start = start_vertex
+
 
     def add_edge(self, start: int, end: int, distance: int) -> None:
         start = self.get_vertex_by_id(start)
@@ -169,9 +175,11 @@ class Graph:
         start.add_edge(Edge(start, end, distance))
         end.add_edge(Edge(end, start, distance))
 
+
     def define_reward(self, reward: float, vertex: Vertex) -> None:
         vertex.r = reward
 
+    # TODO Consertar isso aqui
     def read_table_q(self, table_name: str = "table_q.csv") -> None:
         table_name = "table_q/" + table_name
         try:
@@ -199,21 +207,24 @@ class Graph:
 
 class Agent:
 
-    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
+    def __init__(self, graph: Graph) -> None:
         self.graph = graph
         self.current = graph.start
         self.path = []
         self.epoch = 0
         self.path.append(self.current)
-        self.delta_q_total = delta_q_total
+        self.delta_q_total = 0.0
         self.list_delta_q = [0]
         self.converged = False
+
 
     def get_random_action(self) -> int:
         return int(random.random() * len(self.current.edges))
 
+
     def random_policy(self) -> int:
         return int(self.get_random_action())
+
 
     def greedy_policy(self) -> int:
         # Has a chance of EPSILON to exploit
@@ -223,8 +234,10 @@ class Agent:
         # Otherwise, explore
         return self.get_random_action()
 
+
     def greater_policy(self) -> int:
         return self.current.get_best_action_index()
+
 
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_id(
@@ -234,11 +247,13 @@ class Agent:
         self.path.clear()
         self.path.append(self.current)
 
+
     def verify_convergence(self) -> bool:
         if is_converged(self.list_delta_q):
             self.converged = True
             return True
         return False
+
 
     def train(self) -> None:
         while not self.converged:
@@ -246,6 +261,7 @@ class Agent:
                 self.move()
 
             self.reset_agent()
+
 
     def generate_path_interest(self, start_id, categories: list) -> list:
         path = []
@@ -304,6 +320,7 @@ class Agent:
         print("Quantidade de passos: ",len(path))
         return path
 
+
     def generate_fast_path(self, start_id) -> list:
         path = []
         start = self.graph.get_vertex_by_id(start_id)
@@ -322,13 +339,11 @@ class Agent:
         return path
 
 
-#create a class QLearningAgent that implements Agent
-
-
 class QLearningAgent(Agent):
 
-    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
-        super().__init__(graph, delta_q_total)
+    def __init__(self, graph: Graph,) -> None:
+        super().__init__(graph)
+
 
     def update_q_value(self, next_vertex) -> None:
         has_change = False
@@ -357,6 +372,7 @@ class QLearningAgent(Agent):
                 # save_delta_q_list(self.list_delta_q)
                 # generate_plot(self.list_delta_q)
 
+
     def move(self) -> None:
         action_generated = self.greedy_policy()
         chosen_vertex = self.current.edges[action_generated].end
@@ -369,8 +385,8 @@ class QLearningAgent(Agent):
 
 class SarsaAgent(Agent):
 
-    def __init__(self, graph: Graph, delta_q_total=0.0) -> None:
-        super().__init__(graph, delta_q_total)
+    def __init__(self, graph: Graph) -> None:
+        super().__init__(graph)
 
     def update_q_value(self, next_vertex) -> None:
         has_change = False
@@ -405,6 +421,7 @@ class SarsaAgent(Agent):
             self.converged = True
             # save_delta_q_list(self.list_delta_q)
             # generate_plot(self.list_delta_q)
+
 
     def move(self) -> None:
         next_action = self.greedy_policy()
@@ -449,7 +466,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
 
 
 # create table q for every vertex
-def full_run():
+def full_run(algorithm: Agent):
     g = Graph()
     g.read_csv()
     all_vertex = g.get_all_vertices()
@@ -465,14 +482,14 @@ def full_run():
         g.set_goal(goal_vertex=goal_vertex)
         g.define_reward(10, g.goal)
 
-        a = QLearningAgent(g)
+        a = algorithm(g)
         a.train()
 
         save_table_q(g, file_name=f"table_q_{vertex.id}.csv")
 
 
 # create table_q.csv for only one vertex
-def single_run(start_id, goal_id):
+def single_run(start_id, goal_id, algorithm: Agent):
     g = Graph()
     g.read_csv()
     start_vertex = g.get_vertex_by_id(start_id)
@@ -481,8 +498,7 @@ def single_run(start_id, goal_id):
     g.set_goal(goal_vertex)
     g.define_reward(10.0, g.goal)
 
-    a = QLearningAgent(g)
-    # a = SarsaAgent(g)
+    a = algorithm(g)
 
     a.train()
 
@@ -492,5 +508,24 @@ def single_run(start_id, goal_id):
     save_path([vertex.id for vertex in path])
 
 
-TODO: MOBILE
-"""
+def get_path(start_id, goal_id, interest_categories, algorithm: Agent):
+    g = Graph()
+    g.read_csv()
+    start_vertex = g.get_vertex_by_id(start_id)
+    g.set_start(start_vertex)
+    goal_vertex = g.get_vertex_by_id(goal_id)
+    g.set_goal(goal_vertex)
+    g.define_reward(10.0, g.goal)
+
+    a = algorithm(g)
+
+    a.train()
+    save_table_q(g, file_name=f"table_q_{goal_id}.csv")
+    if interest_categories is not None:
+        categories = interest_categories.split(",")
+        path = a.generate_path_interest(start_id=start_id,
+                                        categories=categories)
+    else:
+        path = a.generate_fast_path(start_id=start_id)
+    save_path([vertex.id for vertex in path])
+    return path
