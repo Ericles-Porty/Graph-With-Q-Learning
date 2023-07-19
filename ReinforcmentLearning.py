@@ -14,17 +14,18 @@ def get_normalized_distance(distance: float, max_distance: float,
 
 def get_delta_q(actual_q: float, reward: float, max_q: float,
                 normalized_distance: float) -> float:
-    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
+    return (ALPHA +
+            (1 - normalized_distance)) * (reward + GAMMA * max_q - actual_q)
     # return ALPHA * (reward + GAMMA * max_q - actual_q)
-
 
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
                       normalized_distance: float) -> float:
-    return (ALPHA + (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
+    return (ALPHA +
+            (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
 
 
-    # verify if the last 5 values of delta q are equal
+# verify if the last 5 values of delta q are equal
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
     if len(delta_q_list) > match_numbers:
         for i in range(1, match_numbers):
@@ -110,7 +111,7 @@ class Graph:
 
             vertex_id = int(line[0])
             name = str(line[1])
-            category = str(line[4])
+            category = str(line[2])
 
             self.add_vertex(Vertex(vertex_id, name, category))
 
@@ -123,7 +124,7 @@ class Graph:
 
             start = str(line[0])
             end = str(line[1])
-            distance = int(line[3])
+            distance = int(line[2])
 
             if distance < self.min_distance:
                 self.min_distance = distance
@@ -160,21 +161,17 @@ class Graph:
                 return vertex
         raise Exception(f"Vertex with name {name} not found")
 
-
     def set_goal(self, goal_vertex: Vertex) -> None:
         self.goal = goal_vertex
 
-
     def set_start(self, start_vertex: Vertex) -> None:
         self.start = start_vertex
-
 
     def add_edge(self, start: int, end: int, distance: int) -> None:
         start = self.get_vertex_by_id(start)
         end = self.get_vertex_by_id(end)
         start.add_edge(Edge(start, end, distance))
         end.add_edge(Edge(end, start, distance))
-
 
     def define_reward(self, reward: float, vertex: Vertex) -> None:
         vertex.r = reward
@@ -217,14 +214,11 @@ class Agent:
         self.list_delta_q = [0]
         self.converged = False
 
-
     def get_random_action(self) -> int:
         return int(random.random() * len(self.current.edges))
 
-
     def random_policy(self) -> int:
         return int(self.get_random_action())
-
 
     def greedy_policy(self) -> int:
         # Has a chance of EPSILON to exploit
@@ -234,10 +228,8 @@ class Agent:
         # Otherwise, explore
         return self.get_random_action()
 
-
     def greater_policy(self) -> int:
         return self.current.get_best_action_index()
-
 
     def reset_agent(self) -> None:
         random_vertex = self.graph.get_vertex_by_id(
@@ -247,13 +239,11 @@ class Agent:
         self.path.clear()
         self.path.append(self.current)
 
-
     def verify_convergence(self) -> bool:
         if is_converged(self.list_delta_q):
             self.converged = True
             return True
         return False
-
 
     def train(self) -> None:
         while not self.converged:
@@ -262,88 +252,88 @@ class Agent:
 
             self.reset_agent()
 
+    # def generate_path_interest(self, start_id, categories: list) -> list:
+    #     path = []
+    #     interest_vertexes = []
 
-    def generate_path_interest(self, start_id, categories: list) -> list:
-        path = []
-        interest_vertexes = []
+    #     # Get all vertexes with the same category
+    #     for category in categories:
+    #         for vertex in self.graph.get_all_vertices():
+    #             if vertex.category == category:
+    #                 interest_vertexes.append(vertex)
+    #         print("Interest vertexes:", end=" ")
+    #         print([i.name for i in interest_vertexes])
 
-        # Get all vertexes with the same category
-        for category in categories:
-            for vertex in self.graph.get_all_vertices():
-                if vertex.category == category:
-                    interest_vertexes.append(vertex)
-            print("Interest vertexes:", end=" ")
-            print([i.name for i in interest_vertexes])
+    #     list_of_tables = []
 
-        list_of_tables = []
+    #     # Get all tables of the interest vertexes
+    #     for vertex in interest_vertexes:
+    #         _file = open(f"table_q/table_q_{vertex.id}.csv",
+    #                      "r",
+    #                      encoding="utf-8-sig")
+    #         table = []
+    #         for line in _file:
+    #             line = line.split(",")
+    #             table.append(line)
+    #         list_of_tables.append(table)
 
-        # Get all tables of the interest vertexes
-        for vertex in interest_vertexes:
-            _file = open(f"table_q/table_q_{vertex.id}.csv",
-                         "r",
-                         encoding="utf-8-sig")
-            table = []
-            for line in _file:
-                line = line.split(",")
-                table.append(line)
-            list_of_tables.append(table)
+    #     start = self.graph.get_vertex_by_id(start_id)
+    #     self.current = start
+    #     path.append(self.current)
+    #     # while list of interest vertexes is not empty
+    #     while len(interest_vertexes) > 0:
+    #         bigger_q = 0
+    #         index = 0
+    #         for i in range(len(list_of_tables)):
+    #             if float(list_of_tables[i][self.current.id][2]) > bigger_q:
+    #                 bigger_q = float(list_of_tables[i][self.current.id][2])
+    #                 index = i
 
-        start = self.graph.get_vertex_by_id(start_id)
-        self.current = start
-        path.append(self.current)
-        # while list of interest vertexes is not empty
-        while len(interest_vertexes) > 0:
-            bigger_q = 0
-            index = 0
-            for i in range(len(list_of_tables)):
-                if float(list_of_tables[i][self.current.id][2]) > bigger_q:
-                    bigger_q = float(list_of_tables[i][self.current.id][2])
-                    index = i
+    #         # while current vertex is not the interest vertex
+    #         while self.current != interest_vertexes[index]:
+    #             self.current = self.graph.get_vertex_by_id(
+    #                 list_of_tables[index][self.current.id][1])
+    #             path.append(self.current)
 
-            # while current vertex is not the interest vertex
-            while self.current != interest_vertexes[index]:
-                self.current = self.graph.get_vertex_by_id(
-                    list_of_tables[index][self.current.id][1])
-                path.append(self.current)
+    #         list_of_tables.pop(index)
+    #         interest_vertexes.pop(index)
 
-            list_of_tables.pop(index)
-            interest_vertexes.pop(index)
+    #     # at the end, append the goal path
+    #     while self.current != self.graph.goal:
+    #         action_generated = self.current.get_best_action_index()
+    #         self.current = self.current.edges[action_generated].end
+    #         path.append(self.current)
 
-        # at the end, append the goal path
-        while self.current != self.graph.goal:
-            action_generated = self.current.get_best_action_index()
-            self.current = self.current.edges[action_generated].end
-            path.append(self.current)
+    #     print("Path: ", end=" ")
+    #     print([p.id for p in path])
+    #     print("Quantidade de passos: ", len(path))
+    #     return path
 
-        print("Path: ", end=" ")
-        print([p.id for p in path])
-        print("Quantidade de passos: ",len(path))
-        return path
+    # def generate_fast_path(self, start_id) -> list:
+    #     path = []
+    #     start = self.graph.get_vertex_by_id(start_id)
+    #     self.current = start
 
+    #     path.append(self.current)
 
-    def generate_fast_path(self, start_id) -> list:
-        path = []
-        start = self.graph.get_vertex_by_id(start_id)
-        self.current = start
+    #     while self.current != self.graph.goal:
+    #         action_generated = self.current.get_best_action_index()
 
-        path.append(self.current)
+    #         path.append(self.current.edges[action_generated].end)
 
-        while self.current != self.graph.goal:
-            action_generated = self.current.get_best_action_index()
+    #         self.path.append(self.current.edges[action_generated].end)
+    #         self.current = self.path[-1]
 
-            path.append(self.current.edges[action_generated].end)
-
-            self.path.append(self.current.edges[action_generated].end)
-            self.current = self.path[-1]
-
-        return path
+    #     return path
 
 
 class QLearningAgent(Agent):
 
-    def __init__(self, graph: Graph,) -> None:
+    def __init__(
+        self,
+        graph: Graph,
+    ) -> None:
         super().__init__(graph)
-
 
     def update_q_value(self, next_vertex) -> None:
         has_change = False
@@ -371,7 +361,6 @@ class QLearningAgent(Agent):
                 self.converged = True
                 # save_delta_q_list(self.list_delta_q)
                 # generate_plot(self.list_delta_q)
-
 
     def move(self) -> None:
         action_generated = self.greedy_policy()
@@ -421,7 +410,6 @@ class SarsaAgent(Agent):
             self.converged = True
             # save_delta_q_list(self.list_delta_q)
             # generate_plot(self.list_delta_q)
-
 
     def move(self) -> None:
         next_action = self.greedy_policy()
@@ -488,6 +476,7 @@ def full_run(algorithm: Agent):
         save_table_q(g, file_name=f"table_q_{vertex.id}.csv")
 
 
+
 # create table_q.csv for only one vertex
 def single_run(start_id, goal_id, algorithm: Agent):
     g = Graph()
@@ -507,25 +496,3 @@ def single_run(start_id, goal_id, algorithm: Agent):
     path = a.generate_path_interest(start_id=start_id, categories=["Tech"])
     save_path([vertex.id for vertex in path])
 
-
-def get_path(start_id, goal_id, interest_categories, algorithm: Agent):
-    g = Graph()
-    g.read_csv()
-    start_vertex = g.get_vertex_by_id(start_id)
-    g.set_start(start_vertex)
-    goal_vertex = g.get_vertex_by_id(goal_id)
-    g.set_goal(goal_vertex)
-    g.define_reward(10.0, g.goal)
-
-    a = algorithm(g)
-
-    a.train()
-    save_table_q(g, file_name=f"table_q_{goal_id}.csv")
-    if interest_categories is not None:
-        categories = interest_categories.split(",")
-        path = a.generate_path_interest(start_id=start_id,
-                                        categories=categories)
-    else:
-        path = a.generate_fast_path(start_id=start_id)
-    save_path([vertex.id for vertex in path])
-    return path
