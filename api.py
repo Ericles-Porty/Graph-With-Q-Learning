@@ -17,7 +17,8 @@ def get_distance(x1, y1, x2, y2):
 
 
 def get_path(start_id: int, goal_id: int, algorithm: str):
-    path = []
+    
+
     total_distance = 0
 
     # get the vertices
@@ -40,12 +41,11 @@ def get_path(start_id: int, goal_id: int, algorithm: str):
         table[line_split[0]] = {
             "next_vertex": int(line_split[1]),
         }
-    print (vertices_dict)
-    print( )
-    print (table)
-    time.sleep(5)
-    # path from start to goal
+
+    path = []
     current = start_id
+    path.append(current)
+    # path from start to goal
     while current != goal_id:
         distance = get_distance(
             vertices_dict[str(current)]["pos_x"],
@@ -59,7 +59,7 @@ def get_path(start_id: int, goal_id: int, algorithm: str):
     return path, total_distance
 
 
-def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
+def get_path_interest(start_id: int, goal_id: int, n_interests: int,
                           interests: list, algorithm: str):
     total_distance = 0
 
@@ -148,19 +148,17 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
 
     return path, total_distance
 
-
-full_run(algorithm=QLearningAgent)
+# full_run(algorithm=QLearningAgent)
 
 app = FastAPI(swagger_ui_parameters={"defaultModelsExpandDepth": -1})
-
 
 @app.get("/path/{id_origin}/{id_target}/{n_interests}", tags=["Path"])
 async def get_path_request(
     id_origin: int,
     id_target: int,
     n_interests: int,
-    algorithm: Literal["QLearning", "Sarsa", "Astar", "BFS",
-                       "DFS"] = "QLearning",
+    algorithm: Literal["QLearning", "Sarsa", "Astar", "Largura",
+                       "Profundidade"] = "QLearning",
     interests: str | None = Query(
         None,
         description=
@@ -181,7 +179,7 @@ async def get_path_request(
         interests = [interest.strip().lower() for interest in interests
                      ]  # remove spaces and convert to lowercase
 
-        path, total_distance = get_path_interest_new(
+        path, total_distance = get_path_interest(
             start_id=id_origin,
             goal_id=id_target,
             n_interests=n_interests,
