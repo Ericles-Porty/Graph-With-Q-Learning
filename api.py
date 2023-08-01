@@ -38,9 +38,12 @@ def get_path(start_id: int, goal_id: int, algorithm: str):
     for line in _file.readlines():
         line_split = line.split(",")
         table[line_split[0]] = {
-            "next_vertex": line_split[1],
+            "next_vertex": int(line_split[1]),
         }
-
+    print (vertices_dict)
+    print( )
+    print (table)
+    time.sleep(5)
     # path from start to goal
     current = start_id
     while current != goal_id:
@@ -87,8 +90,7 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
     path = []
     path.append(start_id)
     current = start_id
-    print(interest_vertexes_dict)
-    print(current)
+
     # while list of interest vertexes is not empty
     for i in range(n_iterations):
         smaller_distance = 9999
@@ -114,8 +116,8 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
                     distance = get_distance(
                         vertices_dict[str(current)]["pos_x"],
                         vertices_dict[str(current)]["pos_y"],
-                        vertices_dict[line_split[1]]["pos_x"],
-                        vertices_dict[line_split[1]]["pos_y"])
+                        vertices_dict[str(int(line_split[1]))]["pos_x"], # double conversion to avoid error
+                        vertices_dict[str(int(line_split[1]))]["pos_y"])
                     current = int(line_split[1])
                     total_distance += distance
                     path.append(current)
@@ -130,7 +132,7 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
     for line in _file.readlines():
         line_split = line.split(",")
         table[line_split[0]] = {
-            "next_vertex": line_split[1],
+            "next_vertex": int(line_split[1]),
         }
 
     # at the end, append the goal path
@@ -145,6 +147,7 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
         total_distance += distance
 
     return path, total_distance
+
 
 # full_run(algorithm=QLearningAgent)
 
@@ -166,41 +169,26 @@ async def get_path_request(
 
     path = []
 
+    # directly from start to goal
     if interests is None:
         path, total_distance = get_path(start_id=id_origin,
                                         goal_id=id_target,
                                         algorithm=algorithm.lower())
 
-    if interests is not None:
+    # with interests
+    else:
         interests = interests.split(",")
         interests = [interest.strip().lower() for interest in interests
                      ]  # remove spaces and convert to lowercase
 
-    path, total_distance = get_path_interest_new(start_id=id_origin,
-                                                 goal_id=id_target,
-                                                 n_interests=n_interests,
-                                                 interests=interests,
-                                                 algorithm=algorithm.lower())
+        path, total_distance = get_path_interest_new(
+            start_id=id_origin,
+            goal_id=id_target,
+            n_interests=n_interests,
+            interests=interests,
+            algorithm=algorithm.lower())
 
-    # if algorithm.lower() in ["astar", "bfs", "dfs"]:
-    #     path = get_path(start_id=id_origin,
-    #                     goal_id=id_target,
-    #                     algorithm=algorithm.lower())
-    # else:
-
-    #     # path = get_path_interest(start_id=id_origin,
-    #     #                          goal_id=id_target,
-    #     #                          categories=interests,
-    #     #                          algorithm=algorithm.lower())
-    #     path, total_distance = get_path_interest_new(
-    #         start_id=id_origin,
-    #         goal_id=id_target,
-    #         n_interests=n_interests,
-    #         categories=interests,
-    #         algorithm=algorithm.lower())
-    #     print(f"Distância percorrida em metros: {total_distance:.2f}")
-
-    return {"path": path, "distance": total_distance, "steps": len(path)}
+    return {"path": path, "total_distance": total_distance, "steps": len(path)}
 
 
 @app.get("/", include_in_schema=False)
