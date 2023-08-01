@@ -21,9 +21,16 @@ def get_delta_q(actual_q: float, reward: float, max_q: float,
 
 def get_delta_q_sarsa(actual_q: float, reward: float, next_q: float,
                       normalized_distance: float) -> float:
-    return (ALPHA +
-            (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
+    # return (ALPHA +
+            # (1 - normalized_distance)) * (reward + GAMMA * next_q - actual_q)
+    return ALPHA * (reward + GAMMA * next_q - actual_q)
 
+# used for generate graph with matplotlib
+def save_delta_q_list(dq: list) -> None:
+    _file = open("delta_q.csv", "w", encoding="utf-8")
+    for i in dq:
+        _file.write(f"{i}\n")
+    _file.close()
 
 # verify if the last 5 values of delta q are equal
 def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
@@ -33,15 +40,7 @@ def is_converged(delta_q_list: list, match_numbers: int = 5) -> bool:
                 return False
         return True
 
-
-# TODO APAGAR ISSO DPS
-def save_delta_q_list(dq: list) -> None:
-    _file = open("delta_q.csv", "w", encoding="utf-8")
-    for i in dq:
-        _file.write(f"{i}\n")
-    _file.close()
-
-
+# save path in csv file
 def save_path(path: list) -> None:
     _file = open("path.csv", "w", encoding="utf-8")
 
@@ -104,7 +103,7 @@ class Graph:
         self.max_distance = 0
 
     def read_csv(self) -> None:
-        _file = open("vertices.csv", "r", encoding="utf-8")
+        _file = open("vertices.csv", "r", encoding="utf-8-sig")
 
         for line in _file:
             line = line.split(",")
@@ -122,8 +121,8 @@ class Graph:
         for line in _file:
             line = line.split(",")
 
-            start = str(line[0])
-            end = str(line[1])
+            start = int(line[0])
+            end = int(line[1])
             distance = int(line[2])
 
             if distance < self.min_distance:
@@ -176,31 +175,6 @@ class Graph:
     def define_reward(self, reward: float, vertex: Vertex) -> None:
         vertex.r = reward
 
-    # TODO Consertar isso aqui
-    def read_table_q(self, table_name: str = "table_q.csv") -> None:
-        table_name = "table_q/" + table_name
-        try:
-            _file = open(table_name, "r", encoding="utf-8-sig")
-            for line in _file:
-                line = line.split(",")
-
-                start = self.get_vertex_by_id(line[0])
-                end = self.get_vertex_by_id(line[1])
-                q = float(line[2])
-
-                for edge in start.edges:
-                    if edge.end == end:
-                        edge.q = q
-
-            _file.close()
-        except FileNotFoundError:
-            return
-            # option = input("Do you want to run without table_q? (y/n) ")
-            # if option == "y" or option == "Y":
-            #     return
-            # else:
-            #     exit(1)
-
 
 class Agent:
 
@@ -251,80 +225,6 @@ class Agent:
                 self.move()
 
             self.reset_agent()
-
-    # def generate_path_interest(self, start_id, categories: list) -> list:
-    #     path = []
-    #     interest_vertexes = []
-
-    #     # Get all vertexes with the same category
-    #     for category in categories:
-    #         for vertex in self.graph.get_all_vertices():
-    #             if vertex.category == category:
-    #                 interest_vertexes.append(vertex)
-    #         print("Interest vertexes:", end=" ")
-    #         print([i.name for i in interest_vertexes])
-
-    #     list_of_tables = []
-
-    #     # Get all tables of the interest vertexes
-    #     for vertex in interest_vertexes:
-    #         _file = open(f"table_q/table_q_{vertex.id}.csv",
-    #                      "r",
-    #                      encoding="utf-8-sig")
-    #         table = []
-    #         for line in _file:
-    #             line = line.split(",")
-    #             table.append(line)
-    #         list_of_tables.append(table)
-
-    #     start = self.graph.get_vertex_by_id(start_id)
-    #     self.current = start
-    #     path.append(self.current)
-    #     # while list of interest vertexes is not empty
-    #     while len(interest_vertexes) > 0:
-    #         bigger_q = 0
-    #         index = 0
-    #         for i in range(len(list_of_tables)):
-    #             if float(list_of_tables[i][self.current.id][2]) > bigger_q:
-    #                 bigger_q = float(list_of_tables[i][self.current.id][2])
-    #                 index = i
-
-    #         # while current vertex is not the interest vertex
-    #         while self.current != interest_vertexes[index]:
-    #             self.current = self.graph.get_vertex_by_id(
-    #                 list_of_tables[index][self.current.id][1])
-    #             path.append(self.current)
-
-    #         list_of_tables.pop(index)
-    #         interest_vertexes.pop(index)
-
-    #     # at the end, append the goal path
-    #     while self.current != self.graph.goal:
-    #         action_generated = self.current.get_best_action_index()
-    #         self.current = self.current.edges[action_generated].end
-    #         path.append(self.current)
-
-    #     print("Path: ", end=" ")
-    #     print([p.id for p in path])
-    #     print("Quantidade de passos: ", len(path))
-    #     return path
-
-    # def generate_fast_path(self, start_id) -> list:
-    #     path = []
-    #     start = self.graph.get_vertex_by_id(start_id)
-    #     self.current = start
-
-    #     path.append(self.current)
-
-    #     while self.current != self.graph.goal:
-    #         action_generated = self.current.get_best_action_index()
-
-    #         path.append(self.current.edges[action_generated].end)
-
-    #         self.path.append(self.current.edges[action_generated].end)
-    #         self.current = self.path[-1]
-
-    #     return path
 
 
 class QLearningAgent(Agent):
@@ -449,7 +349,7 @@ def save_table_q(g: Graph, file_name: str = "table_q.csv") -> None:
                 start = edge.start
                 end = edge.end
 
-        _file.write(f"{start.id},{end.id},{bigger_q}\n")
+        _file.write(f"{start.id},{end.id}\n")
     _file.close()
 
 
@@ -492,7 +392,7 @@ def single_run(start_id, goal_id, algorithm: Agent):
     a.train()
 
     save_table_q(g, file_name=f"table_q_{goal_id}.csv")
-    # path = a.generate_path_interest(start_id=start_id, categories=["Tech", "Food", "Entertainment", "Fashion", "Market"])
+
     path = a.generate_path_interest(start_id=start_id, categories=["Tech"])
     save_path([vertex.id for vertex in path])
 

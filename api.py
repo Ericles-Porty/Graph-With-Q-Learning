@@ -149,7 +149,7 @@ def get_path_interest_new(start_id: int, goal_id: int, n_interests: int,
     return path, total_distance
 
 
-# full_run(algorithm=QLearningAgent)
+full_run(algorithm=QLearningAgent)
 
 app = FastAPI(swagger_ui_parameters={"defaultModelsExpandDepth": -1})
 
