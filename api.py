@@ -11,23 +11,33 @@ list_of_interests_available = [
     "Drink", "Fit", "Games"
 ]
 
+edges_dict = {}
+# save all edges in a dict
+_file = open("arestas.csv", "r", encoding="utf-8-sig")
+for line in _file.readlines():
+    line_split = line.split(",")
+    edges_dict[line_split[0] + "-" + line_split[1]] = float(line_split[2])
+    edges_dict[line_split[1] + "-" + line_split[0]] = float(line_split[2])
+
+vertices_dict = {}
+# save all vertexes in a dict
+_file = open("vertices.csv", "r", encoding="utf-8-sig")
+for line in _file.readlines():
+    line_split = line.split(",")
+    vertices_dict[line_split[0]] = {
+        "name": line_split[1],
+        "category": line_split[2],
+        "pos_x": float(line_split[3]),
+        "pos_y": float(line_split[4])
+    }
+
 
 def get_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
+# get the path from search algorithms (BFS, DFS, A*) without interests
 def get_path_search(start_id: int, goal_id: int, algorithm: str):
-    total_distance = 0
-
-    # get the edges
-    directory = "arestas.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    edges_dict = {}
-    for line in _file.readlines():
-        line_split = line.split(",")
-        edges_dict[line_split[0] + "-" + line_split[1]] = float(line_split[2])
-        edges_dict[line_split[1] + "-" + line_split[0]] = float(line_split[2])
-
     # get path from start to goal
     directory = f"table_q/{algorithm}/table_q_{goal_id}.csv"
     _file = open(directory, "r", encoding="utf-8-sig")
@@ -39,6 +49,7 @@ def get_path_search(start_id: int, goal_id: int, algorithm: str):
             break
 
     # calculate the total distance
+    total_distance = 0
     for i in range(len(path) - 1):
         total_distance += float(edges_dict[str(path[i]) + "-" +
                                            str(path[i + 1])])
@@ -46,10 +57,9 @@ def get_path_search(start_id: int, goal_id: int, algorithm: str):
     return path, total_distance
 
 
+# get the path from reinforcement learning algorithms (Q-Learning, SARSA) without interests
 def get_path_rl(start_id: int, goal_id: int, algorithm: str):
-    total_distance = 0
-
-    # create the goal table
+    # get table from start to goal
     directory = f"table_q/{algorithm}/table_q_{goal_id}.csv"
     _file = open(directory, "r", encoding="utf-8-sig")
     table = {}
@@ -59,20 +69,11 @@ def get_path_rl(start_id: int, goal_id: int, algorithm: str):
             "next_vertex": int(line_split[1]),
         }
 
-    # get the edges to calculate the total distance
-    directory = "arestas.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    edges_dict = {}
-    for line in _file.readlines():
-        line_split = line.split(",")
-        edges_dict[line_split[0] + "-" + line_split[1]] = float(line_split[2])
-        edges_dict[line_split[1] + "-" + line_split[0]] = float(line_split[2])
-
-    path = []
+    # save the path and calculate the total distance
     current = start_id
+    path = []
     path.append(current)
-
-    # path from start to goal
+    total_distance = 0
     while current != goal_id:
         distance = edges_dict[str(current) + "-" +
                               str(table[str(current)]["next_vertex"])]
@@ -86,25 +87,6 @@ def get_path_rl(start_id: int, goal_id: int, algorithm: str):
 def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
                              interests: list, algorithm: str):
     total_distance = 0
-
-    vertices_dict = {}
-    directory = "vertices.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    for line in _file.readlines():
-        line_split = line.split(",")
-        vertices_dict[line_split[0]] = {
-            "category": line_split[2],
-            "pos_x": float(line_split[3]),
-            "pos_y": float(line_split[4])
-        }
-
-    edges_dict = {}
-    directory = "arestas.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    for line in _file.readlines():
-        line_split = line.split(",")
-        edges_dict[line_split[0] + "-" + line_split[1]] = float(line_split[2])
-        edges_dict[line_split[1] + "-" + line_split[0]] = float(line_split[2])
 
     interest_vertexes_dict = {}
 
@@ -186,25 +168,6 @@ def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
 def get_path_rl_interest(start_id: int, goal_id: int, max_interests: int,
                          interests: list, algorithm: str):
     total_distance = 0
-
-    vertices_dict = {}
-    directory = "vertices.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    for line in _file.readlines():
-        line_split = line.split(",")
-        vertices_dict[line_split[0]] = {
-            "category": line_split[2],
-            "pos_x": float(line_split[3]),
-            "pos_y": float(line_split[4])
-        }
-
-    edges_dict = {}
-    directory = "arestas.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    for line in _file.readlines():
-        line_split = line.split(",")
-        edges_dict[line_split[0] + "-" + line_split[1]] = float(line_split[2])
-        edges_dict[line_split[1] + "-" + line_split[0]] = float(line_split[2])
 
     interest_vertexes_dict = {}
 
@@ -309,13 +272,13 @@ async def get_path_request(
                                                    goal_id=id_target,
                                                    algorithm=algorithm.lower())
         else:
-            path, total_distance= get_path_search_interest(
+            path, total_distance = get_path_search_interest(
                 start_id=id_origin,
                 goal_id=id_target,
                 max_interests=max_interests,
                 interests=interests,
                 algorithm=algorithm.lower())
-           
+
     if algorithm.lower() in ["qlearning", "sarsa"]:
         if interests is None:
             path, total_distance = get_path_rl(start_id=id_origin,
