@@ -86,26 +86,24 @@ def get_path_rl(start_id: int, goal_id: int, algorithm: str):
 
 def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
                              interests: list, algorithm: str):
-    total_distance = 0
-
+    # save a dict of vertexes with the same category
     interest_vertexes_dict = {}
-
-    # Get all vertexes with the same category
     for vertex_id in vertices_dict:
         if vertex_id == start_id or vertex_id == goal_id:
             continue
-
-        if vertices_dict[vertex_id]["category"].lower() in interests.lower():
+        if vertices_dict[vertex_id]["category"].lower() in [
+                i.lower() for i in interests
+        ]:
             interest_vertexes_dict[vertex_id] = vertices_dict[vertex_id]
 
+    # set the number of stabilishments of interest to visit
     n_iterations = max_interests if max_interests < len(
         interest_vertexes_dict) else len(interest_vertexes_dict)
 
+    # go through the interest vertexes
+    total_distance = 0
     total_path = []
-    path = []
     current = start_id
-
-    # while list of interest vertexes is not empty
     while n_iterations > 0 and len(interest_vertexes_dict) > 0:
         smaller_distance = 99999999
         shortest_vertex = None
@@ -121,46 +119,39 @@ def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
                 shortest_vertex = vertex_id
 
         # go through the next shortest interest vertex
+        path = []
         directory = f"table_q/{algorithm}/table_q_{shortest_vertex}.csv"
         _file = open(directory, "r", encoding="utf-8-sig")
         for line in _file.readlines():
             line_split = line.split(",")
             if line_split[0] == str(current):
-                path = [int(i) for i in line_split]  # append the path
-                total_path += path
-                total_path.pop()  # remove the last element
-                current = path[-1]  # update the current vertex
+                path = [int(i) for i in line_split]
+                print(line_split)
                 break
 
         # calculate the total distance
         for i in range(len(path) - 1):
-            if vertices_dict[str(path[i])]["category"].lower() in interests:
-                n_iterations -= 1  # decrement the number of iterations
-
             total_distance += float(edges_dict[str(path[i]) + "-" +
                                                str(path[i + 1])])
-        interest_points.append(interest_vertexes_dict[shortest_vertex]["name"])
-        interest_vertexes_dict.pop(shortest_vertex)
+            print(path[i], " - ", path[i + 1], " = ", total_distance)
+
+        # save the path and the total distance
+        total_path += path
+        total_path.pop()
+
+        # update the current vertex and the number of iterations
+        current = shortest_vertex
         n_iterations -= 1
 
-    # append the goal table to the path
-    directory = f"table_q/{algorithm}/table_q_{goal_id}.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    table = {}
-    for line in _file.readlines():
-        line_split = line.split(",")
-        table[line_split[0]] = {
-            "next_vertex": int(line_split[1]),
-        }
+        # remove the vertex from the interest vertexes dict
+        interest_vertexes_dict.pop(shortest_vertex)
 
-    # at the end, append the goal path
-    total_path.append(current)
-    while current != goal_id:
-        distance = edges_dict[str(current) + "-" +
-                              str(table[str(current)]["next_vertex"])]
-        current = int(table[str(current)]["next_vertex"])
-        total_distance += distance
-        total_path.append(current)
+    # get the path from the last interest vertex to the goal
+    path, distance = get_path_search(current, goal_id, algorithm)
+
+    # save the path and the total distance
+    total_path += path
+    total_distance += distance
 
     return total_path, total_distance
 
