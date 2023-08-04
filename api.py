@@ -89,7 +89,7 @@ def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
     # save a dict of vertexes with the same category
     interest_vertexes_dict = {}
     for vertex_id in vertices_dict:
-        if vertex_id == start_id or vertex_id == goal_id:
+        if int(vertex_id) == start_id or int(vertex_id) == goal_id:
             continue
         if vertices_dict[vertex_id]["category"].lower() in [
                 i.lower() for i in interests
@@ -123,21 +123,20 @@ def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
         directory = f"table_q/{algorithm}/table_q_{shortest_vertex}.csv"
         _file = open(directory, "r", encoding="utf-8-sig")
         for line in _file.readlines():
-            line_split = line.split(",")
+            line_split = line.strip().split(",")
             if line_split[0] == str(current):
                 path = [int(i) for i in line_split]
-                print(line_split)
                 break
 
         # calculate the total distance
         for i in range(len(path) - 1):
             total_distance += float(edges_dict[str(path[i]) + "-" +
                                                str(path[i + 1])])
-            print(path[i], " - ", path[i + 1], " = ", total_distance)
 
-        # save the path and the total distance
+        # save path
         total_path += path
-        total_path.pop()
+        total_path.pop(
+        )  # remove the last vertex of the path because it is the same as the first vertex of the next path
 
         # update the current vertex and the number of iterations
         current = shortest_vertex
@@ -158,27 +157,27 @@ def get_path_search_interest(start_id: int, goal_id: int, max_interests: int,
 
 def get_path_rl_interest(start_id: int, goal_id: int, max_interests: int,
                          interests: list, algorithm: str):
-    total_distance = 0
-
+    # save a dict of vertexes with the same category
     interest_vertexes_dict = {}
-
-    # Get all vertexes with the same category
     for vertex_id in vertices_dict:
-        if vertex_id == start_id or vertex_id == goal_id:
+        if int(vertex_id) == start_id or int(vertex_id) == goal_id:
             continue
-        if vertices_dict[vertex_id]["category"].lower() in interests:
+        if vertices_dict[vertex_id]["category"].lower() in [
+                i.lower() for i in interests
+        ]:
             interest_vertexes_dict[vertex_id] = vertices_dict[vertex_id]
 
+    # set the number of stabilishments of interest to visit
     n_iterations = max_interests if max_interests < len(
         interest_vertexes_dict) else len(interest_vertexes_dict)
 
-    path = []
+    # go through the interest vertexes
+    total_distance = 0
+    total_path = []
     current = start_id
-    path.append(current)
-
-    # while list of interest vertexes is not empty
     while n_iterations > 0 and len(interest_vertexes_dict) > 0:
-        smaller_distance = 9999
+        # get the path from the current vertex to the next shortest interest vertex
+        smaller_distance = 99999999
         shortest_vertex = None
 
         # find the next shortest interest vertex
@@ -190,52 +189,37 @@ def get_path_rl_interest(start_id: int, goal_id: int, max_interests: int,
             if distance < smaller_distance:
                 smaller_distance = distance
                 shortest_vertex = vertex_id
+        # get the path from the current vertex to the next shortest interest vertex
+        path, distance = get_path_rl(current, int(shortest_vertex), algorithm)
 
-        # while current vertex is not the interest vertex
-        while current != int(shortest_vertex):
-            directory = f"table_q/{algorithm}/table_q_{shortest_vertex}.csv"
-            _file = open(directory, "r", encoding="utf-8-sig")
-            for line in _file.readlines():
-                line_split = line.strip().split(",")
-                if line_split[0] == str(current):
-                    distance = float(edges_dict[str(current) + "-" +
-                                                str(line_split[1])])
-                    if vertices_dict[str(
-                            line_split[1])]["category"].lower() in interests:
-                        n_iterations -= 1
-                    current = int(line_split[1])
-                    total_distance += distance
-                    path.append(current)
-                    break
-
-        n_iterations -= 1
-        interest_vertexes_dict.pop(shortest_vertex)
-
-    # append the goal table
-    directory = f"table_q/{algorithm}/table_q_{goal_id}.csv"
-    _file = open(directory, "r", encoding="utf-8-sig")
-    table = {}
-    for line in _file.readlines():
-        line_split = line.split(",")
-        table[line_split[0]] = {
-            "next_vertex": int(line_split[1]),
-        }
-
-    # at the end, append the goal path
-    while current != goal_id:
-        distance = edges_dict[str(current) + "-" +
-                              str(table[str(current)]["next_vertex"])]
-        current = int(table[str(current)]["next_vertex"])
-        path.append(current)
+        # save the path and the total distance
+        total_path += path
         total_distance += distance
+        total_path.pop(
+        )  # remove the last vertex of the path because it is the same as the first vertex of the next path
 
-    return path, total_distance
+        # update the current vertex and the number of iterations
+        current = path[-1]
+        n_iterations -= 1
+
+        # remove the vertex from the interest vertexes dict
+        interest_vertexes_dict.pop(str(current))
+
+    # get the path from the last interest vertex to the goal
+    path, distance = get_path_rl(current, goal_id, algorithm)
+
+    # save the path and the total distance
+    total_path += path
+    total_distance += distance
+
+    return total_path, total_distance
 
 
 # full_run(algorithm=QLearningAgent)
 # full_run(algorithm=SarsaAgent)
 
-app = FastAPI(swagger_ui_parameters={"defaultModelsExpandDepth": -1})
+app = FastAPI(swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+              debug=True)
 
 
 @app.get("/path/{id_origin}/{id_target}/{algorithm}", tags=["Path"])
@@ -252,37 +236,46 @@ async def get_path_request(
         + ", ".join(list_of_interests_available))):
 
     path = []
+    algorithm = algorithm.lower()
 
+    # sanitize the inputs of interests
     if interests is not None:
         interests = interests.split(",")
         interests = [i.lower().strip() for i in interests]
 
-    if algorithm.lower() in ["largura", "profundidade", "astar"]:
+    # check if the algorithm is a search algorithm
+    if algorithm in ["largura", "profundidade", "astar"]:
+        # verify if the user wants to get the path without interests
         if interests is None:
             path, total_distance = get_path_search(start_id=id_origin,
                                                    goal_id=id_target,
-                                                   algorithm=algorithm.lower())
+                                                   algorithm=algorithm)
+        # otherwise, get the path with interests
         else:
             path, total_distance = get_path_search_interest(
                 start_id=id_origin,
                 goal_id=id_target,
                 max_interests=max_interests,
                 interests=interests,
-                algorithm=algorithm.lower())
+                algorithm=algorithm)
 
-    if algorithm.lower() in ["qlearning", "sarsa"]:
+    # check if the algorithm is a reinforcement learning algorithm
+    if algorithm in ["qlearning", "sarsa"]:
+        # verify if the user wants to get the path without interests
         if interests is None:
             path, total_distance = get_path_rl(start_id=id_origin,
                                                goal_id=id_target,
-                                               algorithm=algorithm.lower())
+                                               algorithm=algorithm)
+        # otherwise, get the path with interests
         else:
             path, total_distance = get_path_rl_interest(
                 start_id=id_origin,
                 goal_id=id_target,
                 max_interests=max_interests,
                 interests=interests,
-                algorithm=algorithm.lower())
+                algorithm=algorithm)
 
+    # return a json with the path and the total distance
     return {
         "path": path,
         "total_distance": total_distance,
